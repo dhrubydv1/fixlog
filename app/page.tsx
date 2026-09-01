@@ -1,5 +1,6 @@
 'use client';
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type Fix = {
@@ -30,6 +31,7 @@ export default function Home() {
   const [editingFixId, setEditingFixId] = useState<number | null>(null);
   const [deletingFixId, setDeletingFixId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   function clearForm() {
     setTitle("");
@@ -165,6 +167,15 @@ export default function Home() {
     }
   }
 
+  const filteredFixes = fixes.filter((fix) => {
+    const searchText = [fix.title, fix.problem, fix.errorMessage, fix.tags]
+      .filter((value): value is string => Boolean(value))
+      .join(" ")
+      .toLowerCase();
+
+    return searchText.includes(searchQuery.toLowerCase());
+  });
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 py-16 text-zinc-900">
       <div className="w-full max-w-2xl">
@@ -270,49 +281,67 @@ export default function Home() {
 
         <section>
           <h2 className="text-lg font-semibold">Recent Fixes</h2>
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search fixes..."
+            className="mt-4 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+          />
           {isLoading && <p className="mt-4 text-sm text-zinc-600">Loading fixes...</p>}
           {loadError && <p className="mt-4 text-sm text-red-600">{loadError}</p>}
           {deleteError && <p className="mt-4 text-sm text-red-600">{deleteError}</p>}
           {!isLoading && !loadError && (
             <div className="mt-4 grid gap-4">
-              {fixes.map((fix) => (
-                <article
-                  key={fix.id}
-                  className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"
-                >
-                  <h3 className="text-base font-semibold">{fix.title}</h3>
-                  <p className="mt-2 text-sm text-zinc-600">{fix.problem}</p>
-                  {fix.errorMessage && (
-                    <p className="mt-3 text-sm text-zinc-600">
-                      <span className="font-medium text-zinc-700">Error: </span>
-                      {fix.errorMessage}
-                    </p>
-                  )}
-                  {fix.tags && (
-                    <div className="mt-4 text-sm font-medium text-zinc-500">
-                      {fix.tags}
+              {filteredFixes.length === 0 ? (
+                <p className="text-sm text-zinc-600">No matching fixes found.</p>
+              ) : (
+                filteredFixes.map((fix) => (
+                  <article
+                    key={fix.id}
+                    className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"
+                  >
+                    <h3 className="text-base font-semibold">
+                      <Link
+                        href={`/fixes/${fix.id}`}
+                        className="transition-colors hover:text-zinc-500"
+                      >
+                        {fix.title}
+                      </Link>
+                    </h3>
+                    <p className="mt-2 text-sm text-zinc-600">{fix.problem}</p>
+                    {fix.errorMessage && (
+                      <p className="mt-3 text-sm text-zinc-600">
+                        <span className="font-medium text-zinc-700">Error: </span>
+                        {fix.errorMessage}
+                      </p>
+                    )}
+                    {fix.tags && (
+                      <div className="mt-4 text-sm font-medium text-zinc-500">
+                        {fix.tags}
+                      </div>
+                    )}
+                    <div className="mt-4 flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => startEditingFix(fix)}
+                        disabled={deletingFixId === fix.id}
+                        className="text-sm font-medium text-zinc-700 transition-colors hover:text-zinc-500"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteFix(fix)}
+                        disabled={deletingFixId === fix.id}
+                        className="text-sm font-medium text-red-600 transition-colors hover:text-red-500"
+                      >
+                        {deletingFixId === fix.id ? "Deleting..." : "Delete"}
+                      </button>
                     </div>
-                  )}
-                  <div className="mt-4 flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => startEditingFix(fix)}
-                      disabled={deletingFixId === fix.id}
-                      className="text-sm font-medium text-zinc-700 transition-colors hover:text-zinc-500"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteFix(fix)}
-                      disabled={deletingFixId === fix.id}
-                      className="text-sm font-medium text-red-600 transition-colors hover:text-red-500"
-                    >
-                      {deletingFixId === fix.id ? "Deleting..." : "Delete"}
-                    </button>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                ))
+              )}
             </div>
           )}
         </section>
