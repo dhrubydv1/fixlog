@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Fix = {
   id: number;
   title: string;
   problem: string;
-  errorMessage: string;
-  cause: string;
+  errorMessage: string | null;
+  cause: string | null;
   solution: string;
-  tags: string[];
+  tags: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export default function Home() {
@@ -20,42 +22,75 @@ export default function Home() {
   const [cause, setCause] = useState("");
   const [solution, setSolution] = useState("");
   const [tags, setTags] = useState("");
-  const [fixes, setFixes] = useState<Fix[]>([
-    {
-      id: 1,
-      title: "Vercel login issue",
-      problem: "Login worked locally but failed in production",
-      errorMessage: "",
-      cause: "",
-      solution: "",
-      tags: ["#vercel", "#auth"],
-    },
-  ]);
+  const [fixes, setFixes] = useState<Fix[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    async function loadFixes() {
+      try {
+        const response = await fetch("/api/fixes");
+
+        if (!response.ok) {
+          throw new Error("Unable to load fixes");
+        }
+
+        const data: Fix[] = await response.json();
+        setFixes(data);
+      } catch {
+        setLoadError("Unable to load fixes. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadFixes();
+  }, []);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setIsSaving(true);
+    setSaveError(null);
 
-    const newFix: Fix = {
-      id: Date.now(),
-      title,
-      problem,
-      errorMessage,
-      cause,
-      solution,
-      tags: tags
-        .split(/[\s,]+/)
-        .filter(Boolean)
-        .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`)),
-    };
+    try {
+      const response = await fetch("/api/fixes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          problem,
+          errorMessage,
+          cause,
+          solution,
+          tags: tags
+            .split(/[\s,]+/)
+            .filter(Boolean)
+            .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`))
+            .join(" "),
+        }),
+      });
+      const data = await response.json();
 
-    setFixes([...fixes, newFix]);
-    setShowForm(false);
-    setTitle("");
-    setProblem("");
-    setErrorMessage("");
-    setCause("");
-    setSolution("");
-    setTags("");
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to save fix");
+      }
+
+      const newFix: Fix = data;
+      setFixes((currentFixes) => [newFix, ...currentFixes]);
+      setShowForm(false);
+      setTitle("");
+      setProblem("");
+      setErrorMessage("");
+      setCause("");
+      setSolution("");
+      setTags("");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Unable to save fix");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -140,19 +175,22 @@ export default function Home() {
                 />
               </label>
             </div>
+            {saveError && <p className="mt-4 text-sm text-red-600">{saveError}</p>}
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
+                disabled={isSaving}
                 className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-100"
               >
                 Cancel
               </button>
               <button
                 type="submit"
+                disabled={isSaving}
                 className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700"
               >
-                Save Fix
+                {isSaving ? "Saving..." : "Save Fix"}
               </button>
             </div>
           </form>
@@ -160,24 +198,32 @@ export default function Home() {
 
         <section>
           <h2 className="text-lg font-semibold">Recent Fixes</h2>
-          <div className="mt-4 grid gap-4">
-            {fixes.map((fix) => (
-              <article
-                key={fix.id}
-                className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"
-              >
-                <h3 className="text-base font-semibold">{fix.title}</h3>
-                <p className="mt-2 text-sm text-zinc-600">{fix.problem}</p>
-                {fix.tags.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2 text-sm font-medium text-zinc-500">
-                    {fix.tags.map((tag) => (
-                      <span key={tag}>{tag}</span>
-                    ))}
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
+          {isLoading && <p className="mt-4 text-sm text-zinc-600">Loading fixes...</p>}
+          {loadError && <p className="mt-4 text-sm text-red-600">{loadError}</p>}
+          {!isLoading && !loadError && (
+            <div className="mt-4 grid gap-4">
+              {fixes.map((fix) => (
+                <article
+                  key={fix.id}
+                  className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"
+                >
+                  <h3 className="text-base font-semibold">{fix.title}</h3>
+                  <p className="mt-2 text-sm text-zinc-600">{fix.problem}</p>
+                  {fix.errorMessage && (
+                    <p className="mt-3 text-sm text-zinc-600">
+                      <span className="font-medium text-zinc-700">Error: </span>
+                      {fix.errorMessage}
+                    </p>
+                  )}
+                  {fix.tags && (
+                    <div className="mt-4 text-sm font-medium text-zinc-500">
+                      {fix.tags}
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </main>
