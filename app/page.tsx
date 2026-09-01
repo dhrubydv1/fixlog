@@ -27,6 +27,44 @@ export default function Home() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [editingFixId, setEditingFixId] = useState<number | null>(null);
+  const [deletingFixId, setDeletingFixId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function clearForm() {
+    setTitle("");
+    setProblem("");
+    setErrorMessage("");
+    setCause("");
+    setSolution("");
+    setTags("");
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditingFixId(null);
+    setSaveError(null);
+    clearForm();
+  }
+
+  function startCreatingFix() {
+    setEditingFixId(null);
+    setSaveError(null);
+    clearForm();
+    setShowForm(true);
+  }
+
+  function startEditingFix(fix: Fix) {
+    setEditingFixId(fix.id);
+    setTitle(fix.title);
+    setProblem(fix.problem);
+    setErrorMessage(fix.errorMessage ?? "");
+    setCause(fix.cause ?? "");
+    setSolution(fix.solution);
+    setTags(fix.tags ?? "");
+    setSaveError(null);
+    setShowForm(true);
+  }
 
   useEffect(() => {
     async function loadFixes() {
@@ -53,24 +91,28 @@ export default function Home() {
     event.preventDefault();
     setIsSaving(true);
     setSaveError(null);
+    const isEditing = editingFixId !== null;
 
     try {
-      const response = await fetch("/api/fixes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          problem,
-          errorMessage,
-          cause,
-          solution,
-          tags: tags
-            .split(/[\s,]+/)
-            .filter(Boolean)
-            .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`))
-            .join(" "),
-        }),
-      });
+      const response = await fetch(
+        isEditing ? `/api/fixes/${editingFixId}` : "/api/fixes",
+        {
+          method: isEditing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            problem,
+            errorMessage,
+            cause,
+            solution,
+            tags: tags
+              .split(/[\s,]+/)
+              .filter(Boolean)
+              .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`))
+              .join(" "),
+          }),
+        },
+      );
       const data = await response.json();
 
       if (!response.ok) {
@@ -78,18 +120,48 @@ export default function Home() {
       }
 
       const newFix: Fix = data;
-      setFixes((currentFixes) => [newFix, ...currentFixes]);
-      setShowForm(false);
-      setTitle("");
-      setProblem("");
-      setErrorMessage("");
-      setCause("");
-      setSolution("");
-      setTags("");
+      setFixes((currentFixes) =>
+        isEditing
+          ? currentFixes.map((fix) => (fix.id === newFix.id ? newFix : fix))
+          : [newFix, ...currentFixes],
+      );
+      closeForm();
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Unable to save fix");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function deleteFix(fix: Fix) {
+    const isConfirmed = window.confirm(`Delete "${fix.title}"? This cannot be undone.`);
+
+    if (!isConfirmed) {
+      return;
+    }
+
+    setDeletingFixId(fix.id);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`/api/fixes/${fix.id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to delete fix");
+      }
+
+      setFixes((currentFixes) => currentFixes.filter((item) => item.id !== fix.id));
+
+      if (editingFixId === fix.id) {
+        closeForm();
+      }
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Unable to delete fix");
+    } finally {
+      setDeletingFixId(null);
     }
   }
 
@@ -105,7 +177,7 @@ export default function Home() {
           </div>
           <button
             type="button"
-            onClick={() => setShowForm(true)}
+            onClick={startCreatingFix}
             className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700"
           >
             Add Fix
@@ -179,7 +251,7 @@ export default function Home() {
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={closeForm}
                 disabled={isSaving}
                 className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-100"
               >
@@ -190,7 +262,7 @@ export default function Home() {
                 disabled={isSaving}
                 className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700"
               >
-                {isSaving ? "Saving..." : "Save Fix"}
+                {isSaving ? "Saving..." : editingFixId === null ? "Save Fix" : "Update Fix"}
               </button>
             </div>
           </form>
@@ -200,6 +272,7 @@ export default function Home() {
           <h2 className="text-lg font-semibold">Recent Fixes</h2>
           {isLoading && <p className="mt-4 text-sm text-zinc-600">Loading fixes...</p>}
           {loadError && <p className="mt-4 text-sm text-red-600">{loadError}</p>}
+          {deleteError && <p className="mt-4 text-sm text-red-600">{deleteError}</p>}
           {!isLoading && !loadError && (
             <div className="mt-4 grid gap-4">
               {fixes.map((fix) => (
@@ -220,6 +293,24 @@ export default function Home() {
                       {fix.tags}
                     </div>
                   )}
+                  <div className="mt-4 flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => startEditingFix(fix)}
+                      disabled={deletingFixId === fix.id}
+                      className="text-sm font-medium text-zinc-700 transition-colors hover:text-zinc-500"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteFix(fix)}
+                      disabled={deletingFixId === fix.id}
+                      className="text-sm font-medium text-red-600 transition-colors hover:text-red-500"
+                    >
+                      {deletingFixId === fix.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
