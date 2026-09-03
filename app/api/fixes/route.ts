@@ -1,8 +1,22 @@
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+function optionalString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+export async function GET(request: Request) {
   try {
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const fixes = await prisma.fix.findMany({
+      where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
     });
 
@@ -14,11 +28,23 @@ export async function GET() {
   }
 }
 
-function optionalString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
 export async function POST(request: Request) {
+  let session;
+
+  try {
+    session = await auth.api.getSession({
+      headers: request.headers,
+    });
+  } catch (error) {
+    console.error("Unable to verify session:", error);
+
+    return Response.json({ error: "Unable to verify session" }, { status: 500 });
+  }
+
+  if (!session) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: Record<string, unknown>;
 
   try {
@@ -53,6 +79,7 @@ export async function POST(request: Request) {
         cause: optionalString(body.cause),
         solution,
         tags: optionalString(body.tags),
+        userId: session.user.id,
       },
     });
 

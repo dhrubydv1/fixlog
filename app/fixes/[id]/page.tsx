@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export default async function FixDetailsPage({
@@ -7,6 +9,14 @@ export default async function FixDetailsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session) {
+    redirect("/auth");
+  }
+
   const { id } = await params;
   const fixId = Number(id);
 
@@ -14,8 +24,11 @@ export default async function FixDetailsPage({
     notFound();
   }
 
-  const fix = await prisma.fix.findUnique({
-    where: { id: fixId },
+  const fix = await prisma.fix.findFirst({
+    where: {
+      id: fixId,
+      userId: session.user.id,
+    },
   });
 
   if (!fix) {

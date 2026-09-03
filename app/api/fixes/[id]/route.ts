@@ -1,22 +1,30 @@
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function optionalString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function isRecordNotFound(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "P2025"
-  );
-}
-
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let session;
+
+  try {
+    session = await auth.api.getSession({
+      headers: request.headers,
+    });
+  } catch (error) {
+    console.error("Unable to verify session:", error);
+
+    return Response.json({ error: "Unable to verify session" }, { status: 500 });
+  }
+
+  if (!session) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   const fixId = Number(id);
 
@@ -50,8 +58,11 @@ export async function PATCH(
   }
 
   try {
-    const fix = await prisma.fix.update({
-      where: { id: fixId },
+    const updatedFixes = await prisma.fix.updateMany({
+      where: {
+        id: fixId,
+        userId: session.user.id,
+      },
       data: {
         title,
         problem,
@@ -62,12 +73,23 @@ export async function PATCH(
       },
     });
 
-    return Response.json(fix, { status: 200 });
-  } catch (error) {
-    if (isRecordNotFound(error)) {
+    if (updatedFixes.count === 0) {
       return Response.json({ error: "Fix not found" }, { status: 404 });
     }
 
+    const fix = await prisma.fix.findFirst({
+      where: {
+        id: fixId,
+        userId: session.user.id,
+      },
+    });
+
+    if (!fix) {
+      return Response.json({ error: "Fix not found" }, { status: 404 });
+    }
+
+    return Response.json(fix, { status: 200 });
+  } catch (error) {
     console.error("Unable to update fix:", error);
 
     return Response.json({ error: "Unable to update fix" }, { status: 500 });
@@ -75,9 +97,25 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let session;
+
+  try {
+    session = await auth.api.getSession({
+      headers: request.headers,
+    });
+  } catch (error) {
+    console.error("Unable to verify session:", error);
+
+    return Response.json({ error: "Unable to verify session" }, { status: 500 });
+  }
+
+  if (!session) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   const fixId = Number(id);
 
@@ -86,16 +124,19 @@ export async function DELETE(
   }
 
   try {
-    await prisma.fix.delete({
-      where: { id: fixId },
+    const deletedFixes = await prisma.fix.deleteMany({
+      where: {
+        id: fixId,
+        userId: session.user.id,
+      },
     });
 
-    return Response.json({ message: "Fix deleted" }, { status: 200 });
-  } catch (error) {
-    if (isRecordNotFound(error)) {
+    if (deletedFixes.count === 0) {
       return Response.json({ error: "Fix not found" }, { status: 404 });
     }
 
+    return Response.json({ message: "Fix deleted" }, { status: 200 });
+  } catch (error) {
     console.error("Unable to delete fix:", error);
 
     return Response.json({ error: "Unable to delete fix" }, { status: 500 });
