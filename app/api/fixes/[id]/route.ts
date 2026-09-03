@@ -1,8 +1,13 @@
 import { auth } from "@/lib/auth";
+import { parseFixCategory, type FixCategory } from "@/lib/fix-categories";
 import { prisma } from "@/lib/prisma";
 
 function optionalString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function hasOwnProperty(body: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(body, key);
 }
 
 export async function PATCH(
@@ -46,15 +51,57 @@ export async function PATCH(
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const title = optionalString(body.title);
-  const problem = optionalString(body.problem);
-  const solution = optionalString(body.solution);
+  const updateData: {
+    title?: string;
+    problem?: string;
+    errorMessage?: string | null;
+    cause?: string | null;
+    solution?: string;
+    tags?: string | null;
+    category?: FixCategory | null;
+    isFavorite?: boolean;
+  } = {};
 
-  if (!title || !problem || !solution) {
-    return Response.json(
-      { error: "Title, problem, and solution are required" },
-      { status: 400 },
-    );
+  for (const field of ["title", "problem", "solution"] as const) {
+    if (!hasOwnProperty(body, field)) {
+      continue;
+    }
+
+    const value = optionalString(body[field]);
+
+    if (!value) {
+      return Response.json({ error: `${field} is required` }, { status: 400 });
+    }
+
+    updateData[field] = value;
+  }
+
+  for (const field of ["errorMessage", "cause", "tags"] as const) {
+    if (hasOwnProperty(body, field)) {
+      updateData[field] = optionalString(body[field]);
+    }
+  }
+
+  if (hasOwnProperty(body, "category")) {
+    const category = parseFixCategory(body.category);
+
+    if (category === undefined) {
+      return Response.json({ error: "Invalid category" }, { status: 400 });
+    }
+
+    updateData.category = category;
+  }
+
+  if (hasOwnProperty(body, "isFavorite")) {
+    if (typeof body.isFavorite !== "boolean") {
+      return Response.json({ error: "isFavorite must be a boolean" }, { status: 400 });
+    }
+
+    updateData.isFavorite = body.isFavorite;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return Response.json({ error: "No valid fix fields provided" }, { status: 400 });
   }
 
   try {
@@ -63,14 +110,7 @@ export async function PATCH(
         id: fixId,
         userId: session.user.id,
       },
-      data: {
-        title,
-        problem,
-        errorMessage: optionalString(body.errorMessage),
-        cause: optionalString(body.cause),
-        solution,
-        tags: optionalString(body.tags),
-      },
+      data: updateData,
     });
 
     if (updatedFixes.count === 0) {
@@ -90,9 +130,18 @@ export async function PATCH(
 
     return Response.json(fix, { status: 200 });
   } catch (error) {
-    console.error("Unable to update fix:", error);
+    const errorId = crypto.randomUUID();
 
-    return Response.json({ error: "Unable to update fix" }, { status: 500 });
+    console.error(`Unable to update fix [${errorId}]:`, error);
+
+    return Response.json(
+      {
+        error: "We couldn't save this fix. Please try again.",
+        code: "FIX_UPDATE_FAILED",
+        errorId,
+      },
+      { status: 500 },
+    );
   }
 }
 

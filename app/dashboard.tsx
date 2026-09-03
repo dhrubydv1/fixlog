@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { authClient } from "@/lib/auth-client";
+import { FIX_CATEGORIES } from "@/lib/fix-categories";
 
 type Fix = {
   id: number;
@@ -14,9 +15,15 @@ type Fix = {
   cause: string | null;
   solution: string;
   tags: string | null;
+  category: string | null;
+  isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
 };
+
+type CategoryFilter = "all" | "uncategorized" | (typeof FIX_CATEGORIES)[number];
+type FavoriteFilter = "all" | "favorites" | "non-favorites";
+type SortOption = "newest" | "oldest" | "updated" | "title-asc" | "title-desc";
 
 function SearchIcon() {
   return (
@@ -31,6 +38,15 @@ function PlusIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.12 2.12-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.04 1.56V20.3h-3v-.08A1.7 1.7 0 0 0 10.66 18.66a1.7 1.7 0 0 0-1.88.34l-.06.06-2.12-2.12.06-.06A1.7 1.7 0 0 0 7 15a1.7 1.7 0 0 0-1.56-1.04h-.08v-3h.08A1.7 1.7 0 0 0 7 9.92a1.7 1.7 0 0 0-.34-1.88L6.6 7.98l2.12-2.12.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 11.7 4.7v-.08h3v.08a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.12 2.12-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.04h.08v3h-.08A1.7 1.7 0 0 0 19.4 15Z" />
     </svg>
   );
 }
@@ -82,6 +98,7 @@ export default function Dashboard({ user }: DashboardProps) {
   const [cause, setCause] = useState("");
   const [solution, setSolution] = useState("");
   const [tags, setTags] = useState("");
+  const [category, setCategory] = useState("");
   const [fixes, setFixes] = useState<Fix[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -90,7 +107,13 @@ export default function Dashboard({ user }: DashboardProps) {
   const [editingFixId, setEditingFixId] = useState<number | null>(null);
   const [deletingFixId, setDeletingFixId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
+  const [updatingFavoriteFixId, setUpdatingFavoriteFixId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [favoriteFilter, setFavoriteFilter] = useState<FavoriteFilter>("all");
+  const [sortOption, setSortOption] = useState<SortOption>("newest");
+  const [recentReferenceTime] = useState(() => Date.now());
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
@@ -101,6 +124,7 @@ export default function Dashboard({ user }: DashboardProps) {
     setCause("");
     setSolution("");
     setTags("");
+    setCategory("");
   }
 
   function closeForm() {
@@ -125,6 +149,7 @@ export default function Dashboard({ user }: DashboardProps) {
     setCause(fix.cause ?? "");
     setSolution(fix.solution);
     setTags(fix.tags ?? "");
+    setCategory(fix.category ?? "");
     setSaveError(null);
     setShowForm(true);
   }
@@ -168,6 +193,7 @@ export default function Dashboard({ user }: DashboardProps) {
             errorMessage,
             cause,
             solution,
+            category,
             tags: tags
               .split(/[\s,]+/)
               .filter(Boolean)
@@ -248,16 +274,104 @@ export default function Dashboard({ user }: DashboardProps) {
     }
   }
 
-  const filteredFixes = fixes.filter((fix) => {
-    const searchText = [fix.title, fix.problem, fix.errorMessage, fix.tags]
-      .filter((value): value is string => Boolean(value))
-      .join(" ")
-      .toLowerCase();
+  async function toggleFavorite(fix: Fix) {
+    setUpdatingFavoriteFixId(fix.id);
+    setFavoriteError(null);
 
-    return searchText.includes(searchQuery.toLowerCase());
-  });
+    try {
+      const response = await fetch(`/api/fixes/${fix.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFavorite: !fix.isFavorite }),
+      });
+      const data = await response.json();
 
-  const hasSearchQuery = searchQuery.trim().length > 0;
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to update favorite");
+      }
+
+      const updatedFix: Fix = data;
+      setFixes((currentFixes) =>
+        currentFixes.map((item) => (item.id === updatedFix.id ? updatedFix : item)),
+      );
+    } catch (error) {
+      setFavoriteError(error instanceof Error ? error.message : "Unable to update favorite");
+    } finally {
+      setUpdatingFavoriteFixId(null);
+    }
+  }
+
+  function clearFilters() {
+    setSearchQuery("");
+    setCategoryFilter("all");
+    setFavoriteFilter("all");
+    setSortOption("newest");
+  }
+
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const hasActiveFilters = Boolean(normalizedSearchQuery)
+    || categoryFilter !== "all"
+    || favoriteFilter !== "all"
+    || sortOption !== "newest";
+  const updatedRecentlyThreshold = recentReferenceTime - 7 * 24 * 60 * 60 * 1000;
+  const statistics = {
+    total: fixes.length,
+    favorites: fixes.filter((fix) => fix.isFavorite).length,
+    categoriesUsed: new Set(
+      fixes.flatMap((fix) => (fix.category ? [fix.category] : [])),
+    ).size,
+    updatedRecently: fixes.filter(
+      (fix) => new Date(fix.updatedAt).getTime() >= updatedRecentlyThreshold,
+    ).length,
+  };
+  const visibleFixes = fixes
+    .filter((fix) => {
+      const searchText = [
+        fix.title,
+        fix.problem,
+        fix.errorMessage,
+        fix.cause,
+        fix.solution,
+        fix.tags,
+        fix.category,
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join(" ")
+        .toLowerCase();
+
+      return !normalizedSearchQuery || searchText.includes(normalizedSearchQuery);
+    })
+    .filter((fix) => {
+      if (categoryFilter === "all") {
+        return true;
+      }
+
+      return categoryFilter === "uncategorized"
+        ? fix.category === null
+        : fix.category === categoryFilter;
+    })
+    .filter((fix) => {
+      if (favoriteFilter === "all") {
+        return true;
+      }
+
+      return favoriteFilter === "favorites" ? fix.isFavorite : !fix.isFavorite;
+    })
+    .sort((left, right) => {
+      switch (sortOption) {
+        case "oldest":
+          return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+        case "updated":
+          return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+        case "title-asc":
+          return left.title.localeCompare(right.title);
+        case "title-desc":
+          return right.title.localeCompare(left.title);
+        case "newest":
+        default:
+          return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      }
+    });
   const inputClassName =
     "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/10";
 
@@ -277,11 +391,20 @@ export default function Dashboard({ user }: DashboardProps) {
               <p className="max-w-40 truncate text-sm font-medium text-zinc-800">{user.name}</p>
               <p className="max-w-40 truncate text-xs text-zinc-500">{user.email}</p>
             </div>
+            <Link
+              href="/settings"
+              aria-label="Open settings"
+              title="Settings"
+              className="inline-flex size-9 items-center justify-center rounded-lg text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10 sm:w-auto sm:gap-2 sm:px-3 sm:text-sm sm:font-medium"
+            >
+              <SettingsIcon />
+              <span className="hidden sm:inline">Settings</span>
+            </Link>
             <button
               type="button"
               onClick={handleSignOut}
               disabled={isSigningOut}
-              className="rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:opacity-60 sm:px-3"
+              className="rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:opacity-60 sm:px-3"
             >
               {isSigningOut ? "Logging out..." : "Log out"}
             </button>
@@ -347,6 +470,14 @@ export default function Dashboard({ user }: DashboardProps) {
               <FormField label="Tags" htmlFor="fix-tags">
                 <input id="fix-tags" type="text" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="vercel, auth, deployment" className={inputClassName} />
               </FormField>
+              <FormField label="Category" htmlFor="fix-category">
+                <select id="fix-category" value={category} onChange={(event) => setCategory(event.target.value)} className={inputClassName}>
+                  <option value="">Select category</option>
+                  {FIX_CATEGORIES.map((categoryOption) => (
+                    <option key={categoryOption} value={categoryOption}>{categoryOption}</option>
+                  ))}
+                </select>
+              </FormField>
               <div className="sm:col-span-2">
                 <FormField label="Solution" htmlFor="fix-solution">
                   <textarea id="fix-solution" rows={7} value={solution} onChange={(event) => setSolution(event.target.value)} required placeholder="Write the steps that solved it, so future you can move faster." className={inputClassName} />
@@ -371,7 +502,7 @@ export default function Dashboard({ user }: DashboardProps) {
             <div>
               <h2 id="recent-fixes-heading" className="text-lg font-semibold tracking-tight text-zinc-950">Recent Fixes</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                {isLoading ? "Loading fixes..." : `${filteredFixes.length} ${filteredFixes.length === 1 ? "fix" : "fixes"}`}
+                {isLoading ? "Loading fixes..." : `Showing ${visibleFixes.length} of ${fixes.length} ${fixes.length === 1 ? "fix" : "fixes"}`}
               </p>
             </div>
             {!showForm && fixes.length > 0 && (
@@ -381,31 +512,69 @@ export default function Dashboard({ user }: DashboardProps) {
             )}
           </div>
 
-          <div className="relative mt-5">
-            <label htmlFor="fix-search" className="sr-only">Search fixes</label>
-            <input id="fix-search" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search fixes, errors, causes, or tags..." className="w-full rounded-xl border border-zinc-300 bg-white py-3 pl-10 pr-20 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/10" />
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-zinc-400"><SearchIcon /></span>
-            {searchQuery && (
-              <button type="button" onClick={() => setSearchQuery("")} className="absolute inset-y-0 right-2 my-auto rounded-md px-2 py-1 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">
-                Clear
-              </button>
-            )}
+          <div className="mt-5 grid gap-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <StatisticCard label="Total Fixes" value={statistics.total} isLoading={isLoading} />
+              <StatisticCard label="Favorites" value={statistics.favorites} isLoading={isLoading} />
+              <StatisticCard label="Categories Used" value={statistics.categoriesUsed} isLoading={isLoading} />
+              <StatisticCard label="Updated Recently" value={statistics.updatedRecently} isLoading={isLoading} />
+            </div>
+
+            <div className="relative">
+              <label htmlFor="fix-search" className="sr-only">Search fixes</label>
+              <input id="fix-search" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search fixes, errors, causes, solutions, tags, or categories..." className="w-full rounded-xl border border-zinc-300 bg-white py-3 pl-10 pr-4 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/10" />
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-zinc-400"><SearchIcon /></span>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <FilterSelect label="Category" htmlFor="category-filter" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value as CategoryFilter)}>
+                <option value="all">All Categories</option>
+                {FIX_CATEGORIES.map((categoryOption) => (
+                  <option key={categoryOption} value={categoryOption}>{categoryOption}</option>
+                ))}
+                <option value="uncategorized">Uncategorized</option>
+              </FilterSelect>
+              <FilterSelect label="Favorite status" htmlFor="favorite-filter" value={favoriteFilter} onChange={(event) => setFavoriteFilter(event.target.value as FavoriteFilter)}>
+                <option value="all">All Fixes</option>
+                <option value="favorites">Favorites Only</option>
+                <option value="non-favorites">Non-Favorites</option>
+              </FilterSelect>
+              <FilterSelect label="Sort fixes" htmlFor="sort-fixes" value={sortOption} onChange={(event) => setSortOption(event.target.value as SortOption)}>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="updated">Recently Updated</option>
+                <option value="title-asc">Title A-Z</option>
+                <option value="title-desc">Title Z-A</option>
+              </FilterSelect>
+              <div className="flex items-end">
+                {hasActiveFilters && (
+                  <button type="button" onClick={clearFilters} className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {isLoading && <p className="mt-6 text-sm text-zinc-500">Loading your saved fixes...</p>}
+          {isLoading && <p role="status" className="mt-6 text-sm text-zinc-500">Loading your FixLog…</p>}
           {loadError && <p role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</p>}
           {deleteError && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</p>}
+          {favoriteError && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{favoriteError}</p>}
 
           {!isLoading && !loadError && (
             <div className="mt-5 grid gap-3">
-              {filteredFixes.length === 0 ? (
+              {visibleFixes.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center shadow-sm">
-                  <div className="mx-auto grid size-10 place-items-center rounded-xl bg-zinc-100 text-lg font-semibold text-zinc-600">{hasSearchQuery ? "?" : "F"}</div>
-                  <h3 className="mt-4 text-base font-semibold text-zinc-900">{hasSearchQuery ? "No fixes found" : "No fixes yet"}</h3>
+                  <div className="mx-auto grid size-10 place-items-center rounded-xl bg-zinc-100 text-lg font-semibold text-zinc-600">{hasActiveFilters ? "?" : "F"}</div>
+                  <h3 className="mt-4 text-base font-semibold text-zinc-900">{fixes.length === 0 ? "Your FixLog is empty." : "No fixes match your current filters."}</h3>
                   <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-zinc-500">
-                    {hasSearchQuery ? "Try a different search term." : "Save your first solution so you never have to solve the same problem twice."}
+                    {fixes.length === 0 ? "Save your first solution so you never have to solve the same problem twice." : "Try changing your search or filters."}
                   </p>
-                  {!hasSearchQuery && (
+                  {hasActiveFilters ? (
+                    <button type="button" onClick={clearFilters} className="mt-5 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">
+                      Clear filters
+                    </button>
+                  ) : (
                     <button type="button" onClick={startCreatingFix} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20">
                       <PlusIcon />
                       Add your first fix
@@ -413,7 +582,7 @@ export default function Dashboard({ user }: DashboardProps) {
                   )}
                 </div>
               ) : (
-                filteredFixes.map((fix) => (
+                visibleFixes.map((fix) => (
                   <article key={fix.id} className="group rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition duration-200 hover:border-zinc-300 hover:shadow-md sm:p-6">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
@@ -424,7 +593,21 @@ export default function Dashboard({ user }: DashboardProps) {
                         </h3>
                         <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-600">{fix.problem}</p>
                       </div>
-                      <p className="shrink-0 text-xs font-medium text-zinc-400">Updated {formatUpdatedDate(fix.updatedAt)}</p>
+                      <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => toggleFavorite(fix)}
+                          disabled={updatingFavoriteFixId === fix.id}
+                          title={fix.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                          aria-label={fix.isFavorite ? `Remove ${fix.title} from favorites` : `Add ${fix.title} to favorites`}
+                          aria-busy={updatingFavoriteFixId === fix.id}
+                          className="grid size-8 place-items-center rounded-md text-lg leading-none text-amber-500 transition hover:bg-amber-50 hover:text-amber-600 focus:outline-none focus:ring-4 focus:ring-amber-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <span aria-hidden="true">{fix.isFavorite ? "★" : "☆"}</span>
+                          <span className="sr-only">{updatingFavoriteFixId === fix.id ? "Updating favorite" : fix.isFavorite ? "Favorite" : "Not favorite"}</span>
+                        </button>
+                        <p className="text-xs font-medium text-zinc-400">Updated {formatUpdatedDate(fix.updatedAt)}</p>
+                      </div>
                     </div>
 
                     {fix.errorMessage && (
@@ -436,6 +619,9 @@ export default function Dashboard({ user }: DashboardProps) {
 
                     <div className="mt-5 flex flex-col gap-4 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                          {fix.category ?? "Uncategorized"}
+                        </span>
                         {fix.tags && getTags(fix.tags).map((tag) => (
                           <span key={tag} className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-600">
                             {tag.startsWith("#") ? tag : `#${tag}`}
@@ -459,3 +645,39 @@ export default function Dashboard({ user }: DashboardProps) {
   );
 }
 
+function StatisticCard({ label, value, isLoading }: { label: string; value: number; isLoading: boolean }) {
+  return (
+    <div aria-busy={isLoading} className="rounded-xl border border-zinc-200 bg-white px-4 py-3.5 shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</p>
+      {isLoading ? (
+        <span className="mt-2 block h-7 w-10 animate-pulse rounded bg-zinc-100" />
+      ) : (
+        <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950">{value}</p>
+      )}
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  htmlFor,
+  children,
+  ...selectProps
+}: React.SelectHTMLAttributes<HTMLSelectElement> & {
+  label: string;
+  htmlFor: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <label htmlFor={htmlFor} className="text-xs font-medium text-zinc-600">{label}</label>
+      <select
+        id={htmlFor}
+        {...selectProps}
+        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/10"
+      >
+        {children}
+      </select>
+    </div>
+  );
+}

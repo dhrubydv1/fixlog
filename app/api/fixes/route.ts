@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { parseFixCategory } from "@/lib/fix-categories";
 import { prisma } from "@/lib/prisma";
 
 function optionalString(value: unknown) {
@@ -62,12 +63,17 @@ export async function POST(request: Request) {
   const title = optionalString(body.title);
   const problem = optionalString(body.problem);
   const solution = optionalString(body.solution);
+  const category = parseFixCategory(body.category);
 
   if (!title || !problem || !solution) {
     return Response.json(
       { error: "Title, problem, and solution are required" },
       { status: 400 },
     );
+  }
+
+  if (category === undefined) {
+    return Response.json({ error: "Invalid category" }, { status: 400 });
   }
 
   try {
@@ -79,6 +85,7 @@ export async function POST(request: Request) {
         cause: optionalString(body.cause),
         solution,
         tags: optionalString(body.tags),
+        category,
         userId: session.user.id,
       },
     });

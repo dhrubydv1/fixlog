@@ -83,6 +83,8 @@ model Fix {
   cause        String?
   solution     String
   tags         String?
+  category     String?
+  isFavorite   Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   userId       String
