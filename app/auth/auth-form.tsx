@@ -187,6 +187,17 @@ export default function AuthForm() {
                 />
               </FormField>
 
+              {!isSignUp && (
+                <div className="-mt-2 text-right">
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm font-medium text-zinc-700 underline underline-offset-4 transition hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+              )}
+
               {errorMessage && (
                 <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
                   {errorMessage}
@@ -218,4 +229,3 @@ export default function AuthForm() {
     </main>
   );
 }
-
