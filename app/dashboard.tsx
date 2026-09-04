@@ -21,6 +21,23 @@ type Fix = {
   updatedAt: string;
 };
 
+type FixSuggestion = {
+  title?: string;
+  problem?: string;
+  errorMessage?: string;
+  cause?: string;
+  solution?: string;
+  category?: string;
+  tags?: string[];
+};
+
+type AiSuggestionResponse = {
+  configured: boolean;
+  suggestions?: FixSuggestion;
+  message?: string;
+  error?: string;
+};
+
 type CategoryFilter = "all" | "uncategorized" | (typeof FIX_CATEGORIES)[number];
 type FavoriteFilter = "all" | "favorites" | "non-favorites";
 type SortOption = "newest" | "oldest" | "updated" | "title-asc" | "title-desc";
@@ -87,9 +104,10 @@ type DashboardProps = {
     name: string;
     email: string;
   };
+  aiSuggestionsConfigured: boolean;
 };
 
-export default function Dashboard({ user }: DashboardProps) {
+export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardProps) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
@@ -99,6 +117,9 @@ export default function Dashboard({ user }: DashboardProps) {
   const [solution, setSolution] = useState("");
   const [tags, setTags] = useState("");
   const [category, setCategory] = useState("");
+  const [aiSuggestions, setAiSuggestions] = useState<FixSuggestion | null>(null);
+  const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
+  const [aiSuggestionError, setAiSuggestionError] = useState<string | null>(null);
   const [fixes, setFixes] = useState<Fix[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -125,6 +146,8 @@ export default function Dashboard({ user }: DashboardProps) {
     setSolution("");
     setTags("");
     setCategory("");
+    setAiSuggestions(null);
+    setAiSuggestionError(null);
   }
 
   function closeForm() {
@@ -220,6 +243,57 @@ export default function Dashboard({ user }: DashboardProps) {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function generateSuggestions() {
+    setIsGeneratingSuggestions(true);
+    setAiSuggestionError(null);
+    setAiSuggestions(null);
+
+    try {
+      const response = await fetch("/api/ai/fix-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          problem,
+          errorMessage,
+          existingSolution: solution,
+        }),
+      });
+      const data: AiSuggestionResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Unable to generate suggestions");
+      }
+
+      if (!data.configured || !data.suggestions) {
+        throw new Error(data.message || "AI setup required");
+      }
+
+      setAiSuggestions(data.suggestions);
+    } catch (error) {
+      setAiSuggestionError(
+        error instanceof Error ? error.message : "Unable to generate suggestions",
+      );
+    } finally {
+      setIsGeneratingSuggestions(false);
+    }
+  }
+
+  function applySuggestions() {
+    if (!aiSuggestions) {
+      return;
+    }
+
+    if (aiSuggestions.title) setTitle(aiSuggestions.title);
+    if (aiSuggestions.problem) setProblem(aiSuggestions.problem);
+    if (aiSuggestions.errorMessage) setErrorMessage(aiSuggestions.errorMessage);
+    if (aiSuggestions.cause) setCause(aiSuggestions.cause);
+    if (aiSuggestions.solution) setSolution(aiSuggestions.solution);
+    if (aiSuggestions.category) setCategory(aiSuggestions.category);
+    if (aiSuggestions.tags) setTags(aiSuggestions.tags.join(", "));
+
+    setAiSuggestions(null);
   }
 
   async function handleSignOut() {
@@ -452,6 +526,67 @@ export default function Dashboard({ user }: DashboardProps) {
               </span>
             </div>
 
+            {editingFixId === null && (
+              <div className="flex flex-col gap-2 border-b border-zinc-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div>
+                  <p className="text-sm font-medium text-zinc-800">Need a starting point?</p>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    {aiSuggestionsConfigured
+                      ? "Generate a draft from the problem details, then review it before applying."
+                      : "AI suggestions will be available once AI setup is complete."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={generateSuggestions}
+                  disabled={!aiSuggestionsConfigured || isGeneratingSuggestions || (!problem.trim() && !errorMessage.trim())}
+                  title={aiSuggestionsConfigured ? "Generate Fix suggestions" : "AI setup required"}
+                  aria-describedby="ai-suggestions-status"
+                  className="inline-flex shrink-0 items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+                >
+                  {isGeneratingSuggestions ? "Generating..." : "Generate with AI"}
+                </button>
+                <span id="ai-suggestions-status" className="sr-only">
+                  {!aiSuggestionsConfigured
+                    ? "AI setup required"
+                    : !problem.trim() && !errorMessage.trim()
+                      ? "Add a problem or error message to generate suggestions"
+                      : "AI suggestions are ready to generate"}
+                </span>
+              </div>
+            )}
+
+            {aiSuggestionError && (
+              <p role="alert" className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700 sm:px-6">
+                {aiSuggestionError}
+              </p>
+            )}
+
+            {aiSuggestions && (
+              <section aria-labelledby="ai-suggestions-heading" className="border-b border-blue-100 bg-blue-50/60 px-5 py-5 sm:px-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">AI draft</p>
+                    <h2 id="ai-suggestions-heading" className="mt-1 text-base font-semibold text-zinc-950">Review suggestions before applying</h2>
+                    <p className="mt-1 text-sm text-zinc-600">Nothing has been saved. You can apply, edit, or discard this draft.</p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button type="button" onClick={() => setAiSuggestions(null)} className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Discard</button>
+                    <button type="button" onClick={applySuggestions} className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20">Apply suggestions</button>
+                  </div>
+                </div>
+                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                  {aiSuggestions.title && <SuggestionDetail label="Title" value={aiSuggestions.title} />}
+                  {aiSuggestions.category && <SuggestionDetail label="Category" value={aiSuggestions.category} />}
+                  {aiSuggestions.problem && <SuggestionDetail label="Problem" value={aiSuggestions.problem} />}
+                  {aiSuggestions.errorMessage && <SuggestionDetail label="Error message" value={aiSuggestions.errorMessage} />}
+                  {aiSuggestions.cause && <SuggestionDetail label="Cause" value={aiSuggestions.cause} />}
+                  {aiSuggestions.solution && <SuggestionDetail label="Solution" value={aiSuggestions.solution} />}
+                  {aiSuggestions.tags && <SuggestionDetail label="Tags" value={aiSuggestions.tags.map((tag) => `#${tag}`).join(" ")} />}
+                </dl>
+              </section>
+            )}
+
             <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
               <div className="sm:col-span-2">
                 <FormField label="Title" htmlFor="fix-title">
@@ -654,6 +789,15 @@ function StatisticCard({ label, value, isLoading }: { label: string; value: numb
       ) : (
         <p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950">{value}</p>
       )}
+    </div>
+  );
+}
+
+function SuggestionDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2.5">
+      <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</dt>
+      <dd className="mt-1 whitespace-pre-wrap leading-6 text-zinc-700">{value}</dd>
     </div>
   );
 }

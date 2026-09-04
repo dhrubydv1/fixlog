@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import Dashboard from "@/app/dashboard";
+import { isFixSuggestionsConfigured } from "@/lib/ai";
 import { auth } from "@/lib/auth";
 
 export default async function Home() {
@@ -13,5 +14,8 @@ export default async function Home() {
     redirect("/auth");
   }
 
-  return <Dashboard user={session.user} />;
+  return <Dashboard
+    user={session.user}
+    aiSuggestionsConfigured={isFixSuggestionsConfigured()}
+  />;
 }
