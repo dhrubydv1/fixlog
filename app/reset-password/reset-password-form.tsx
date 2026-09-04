@@ -170,21 +170,30 @@ function PasswordField({
   disabled: boolean;
   autoComplete: "new-password";
 }) {
+  const [isVisible, setIsVisible] = useState(false);
+
   return (
     <div className="grid gap-2">
       <label htmlFor={id} className="text-sm font-medium text-zinc-800">
         {label}
       </label>
-      <input
-        id={id}
-        type="password"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        autoComplete={autoComplete}
-        placeholder="At least 8 characters"
-        disabled={disabled}
-        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/10"
-      />
+      <div className="relative">
+        <input
+          id={id}
+          type={isVisible ? "text" : "password"}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          autoComplete={autoComplete}
+          placeholder="At least 8 characters"
+          disabled={disabled}
+          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 pr-11 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/10"
+        />
+        <PasswordVisibilityButton visible={isVisible} onClick={() => setIsVisible((visible) => !visible)} disabled={disabled} />
+      </div>
     </div>
   );
+}
+
+function PasswordVisibilityButton({ visible, onClick, disabled }: { visible: boolean; onClick: () => void; disabled: boolean }) {
+  return <button type="button" onClick={onClick} disabled={disabled} aria-label={visible ? "Hide password" : "Show password"} title={visible ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 grid w-10 place-items-center rounded-r-lg text-zinc-500 transition hover:text-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:opacity-60">{visible ? <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4"><path d="m3 3 18 18" /><path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" /><path d="M9.9 4.2A10.7 10.7 0 0 1 12 4c5.5 0 9.4 4.8 10 8-.2 1-1 2.8-3.1 4.5M6.6 6.6C4.2 8.2 2.7 10.7 2 12c.6 1.2 4.5 8 10 8 1.4 0 2.7-.3 3.8-.8" /></svg> : <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4"><path d="M2 12s3.6-8 10-8 10 8 10 8-3.6 8-10 8S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>}</button>;
 }

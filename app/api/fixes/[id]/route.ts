@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { parseFixCategory, type FixCategory } from "@/lib/fix-categories";
+import { parseFixVisibility, type FixVisibility } from "@/lib/fix-visibility";
 import { prisma } from "@/lib/prisma";
 
 function optionalString(value: unknown) {
@@ -60,6 +61,7 @@ export async function PATCH(
     tags?: string | null;
     category?: FixCategory | null;
     isFavorite?: boolean;
+    visibility?: FixVisibility;
   } = {};
 
   for (const field of ["title", "problem", "solution"] as const) {
@@ -98,6 +100,16 @@ export async function PATCH(
     }
 
     updateData.isFavorite = body.isFavorite;
+  }
+
+  if (hasOwnProperty(body, "visibility")) {
+    const visibility = parseFixVisibility(body.visibility);
+
+    if (!visibility) {
+      return Response.json({ error: "Invalid visibility" }, { status: 400 });
+    }
+
+    updateData.visibility = visibility;
   }
 
   if (Object.keys(updateData).length === 0) {

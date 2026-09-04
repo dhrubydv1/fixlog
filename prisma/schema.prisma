@@ -12,6 +12,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum FixVisibility {
+  PRIVATE
+  PUBLIC
+}
+
 model User {
   id            String    @id
   name          String
@@ -76,7 +81,7 @@ model Verification {
 }
 
 model Fix {
-  id           Int      @id @default(autoincrement())
+  id           Int           @id @default(autoincrement())
   title        String
   problem      String
   errorMessage String?
@@ -84,11 +89,12 @@ model Fix {
   solution     String
   tags         String?
   category     String?
-  isFavorite   Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isFavorite   Boolean       @default(false)
+  visibility   FixVisibility @default(PRIVATE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

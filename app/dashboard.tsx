@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { FIX_CATEGORIES } from "@/lib/fix-categories";
+import { type FixVisibility } from "@/lib/fix-visibility";
 
 type Fix = {
   id: number;
@@ -17,6 +18,7 @@ type Fix = {
   tags: string | null;
   category: string | null;
   isFavorite: boolean;
+  visibility: FixVisibility;
   createdAt: string;
   updatedAt: string;
 };
@@ -143,6 +145,7 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
   const [solution, setSolution] = useState("");
   const [tags, setTags] = useState("");
   const [category, setCategory] = useState("");
+  const [visibility, setVisibility] = useState<FixVisibility>("PRIVATE");
   const [aiSuggestions, setAiSuggestions] = useState<FixSuggestion | null>(null);
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [aiSuggestionError, setAiSuggestionError] = useState<string | null>(null);
@@ -178,6 +181,7 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
     setSolution("");
     setTags("");
     setCategory("");
+    setVisibility("PRIVATE");
     setAiSuggestions(null);
     setAiSuggestionError(null);
     setSimilarFixes(null);
@@ -207,6 +211,7 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
     setSolution(fix.solution);
     setTags(fix.tags ?? "");
     setCategory(fix.category ?? "");
+    setVisibility(fix.visibility);
     setSaveError(null);
     setShowForm(true);
   }
@@ -251,6 +256,7 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
             cause,
             solution,
             category,
+            visibility,
             tags: tags
               .split(/[\s,]+/)
               .filter(Boolean)
@@ -759,6 +765,22 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
                   ))}
                 </select>
               </FormField>
+              <fieldset className="sm:col-span-2">
+                <legend className="text-sm font-medium text-zinc-800">Visibility</legend>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <label className={`cursor-pointer rounded-lg border p-4 transition ${visibility === "PRIVATE" ? "border-zinc-900 bg-zinc-50 ring-2 ring-zinc-900/10" : "border-zinc-200 bg-white hover:border-zinc-300"}`}>
+                    <input type="radio" name="fix-visibility" value="PRIVATE" checked={visibility === "PRIVATE"} onChange={() => setVisibility("PRIVATE")} className="sr-only" />
+                    <span className="block text-sm font-semibold text-zinc-900">🔒 Private</span>
+                    <span className="mt-1 block text-sm leading-5 text-zinc-600">Only you can access this Fix.</span>
+                  </label>
+                  <label className={`cursor-pointer rounded-lg border p-4 transition ${visibility === "PUBLIC" ? "border-blue-600 bg-blue-50/50 ring-2 ring-blue-600/10" : "border-zinc-200 bg-white hover:border-zinc-300"}`}>
+                    <input type="radio" name="fix-visibility" value="PUBLIC" checked={visibility === "PUBLIC"} onChange={() => setVisibility("PUBLIC")} className="sr-only" />
+                    <span className="block text-sm font-semibold text-zinc-900">🌐 Public</span>
+                    <span className="mt-1 block text-sm leading-5 text-zinc-600">Other developers can view and discover this Fix.</span>
+                  </label>
+                </div>
+                {visibility === "PUBLIC" && <p role="note" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-6 text-amber-800">Make sure this Fix does not contain API keys, passwords, tokens, database credentials, or other secrets.</p>}
+              </fieldset>
               <div className="sm:col-span-2">
                 <FormField label="Solution" htmlFor="fix-solution">
                   <textarea id="fix-solution" rows={7} value={solution} onChange={(event) => setSolution(event.target.value)} required placeholder="Write the steps that solved it, so future you can move faster." className={inputClassName} />
@@ -942,6 +964,9 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
                       <div className="flex flex-wrap gap-2">
                         <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
                           {fix.category ?? "Uncategorized"}
+                        </span>
+                        <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${fix.visibility === "PUBLIC" ? "border-blue-100 bg-blue-50 text-blue-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}`}>
+                          {fix.visibility === "PUBLIC" ? "🌐 Public" : "🔒 Private"}
                         </span>
                         {fix.tags && getTags(fix.tags).map((tag) => (
                           <span key={tag} className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-600">

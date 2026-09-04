@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { parseFixCategory } from "@/lib/fix-categories";
+import { parseFixVisibility } from "@/lib/fix-visibility";
 import { prisma } from "@/lib/prisma";
 
 function optionalString(value: unknown) {
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
   const problem = optionalString(body.problem);
   const solution = optionalString(body.solution);
   const category = parseFixCategory(body.category);
+  const visibility = body.visibility === undefined ? "PRIVATE" : parseFixVisibility(body.visibility);
 
   if (!title || !problem || !solution) {
     return Response.json(
@@ -76,6 +78,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid category" }, { status: 400 });
   }
 
+  if (!visibility) {
+    return Response.json({ error: "Invalid visibility" }, { status: 400 });
+  }
+
   try {
     const fix = await prisma.fix.create({
       data: {
@@ -86,6 +92,7 @@ export async function POST(request: Request) {
         solution,
         tags: optionalString(body.tags),
         category,
+        visibility,
         userId: session.user.id,
       },
     });

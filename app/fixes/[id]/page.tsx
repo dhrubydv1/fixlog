@@ -58,9 +58,11 @@ export default async function FixDetailsPage({
           <header className="border-b border-zinc-200 bg-zinc-50/70 px-5 py-5 sm:px-6 sm:py-6">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">{fix.category ?? "Uncategorized"}</span>
+              <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${fix.visibility === "PUBLIC" ? "border-blue-100 bg-blue-50 text-blue-700" : "border-zinc-200 bg-zinc-50 text-zinc-600"}`}>{fix.visibility === "PUBLIC" ? "🌐 Public" : "🔒 Private"}</span>
               {fix.isFavorite && <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">★ Favorite</span>}
             </div>
             <h1 className="mt-4 break-words text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl">{fix.title}</h1>
+            {fix.visibility === "PUBLIC" && <Link href={`/community/fixes/${fix.id}`} className="mt-4 inline-flex rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">View public page</Link>}
           </header>
 
           <dl className="grid gap-6 px-5 py-6 sm:px-6">
