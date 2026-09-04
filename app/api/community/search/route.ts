@@ -17,8 +17,13 @@ const candidateSelect = {
   category: true,
   visibility: true,
   updatedAt: true,
+  _count: { select: { helpfulVotes: true } },
   user: { select: { name: true } },
 } as const;
+
+function helpfulnessBoost(helpfulCount: number) {
+  return Math.min(0.05, Math.log10(helpfulCount + 1) * 0.02);
+}
 
 export async function POST(request: Request) {
   let session;
@@ -93,7 +98,11 @@ export async function POST(request: Request) {
 
       return [{ ...match, updatedAt: candidate.updatedAt }];
     });
-    const communityMatches = findSimilarFixes(input, communityCandidates, 10).flatMap((match) => {
+    const communityMatches = findSimilarFixes(
+      input,
+      communityCandidates,
+      communityCandidates.length,
+    ).flatMap((match) => {
       const candidate = communityCandidatesById.get(match.id);
 
       if (!candidate) {
@@ -102,10 +111,12 @@ export async function POST(request: Request) {
 
       return [{
         ...match,
+        score: Math.round((match.score + helpfulnessBoost(candidate._count.helpfulVotes)) * 100) / 100,
+        helpfulCount: candidate._count.helpfulVotes,
         updatedAt: candidate.updatedAt,
         authorName: candidate.user.name,
       }];
-    });
+    }).sort((left, right) => right.score - left.score || left.title.localeCompare(right.title)).slice(0, 10);
 
     return Response.json({ ownMatches, communityMatches });
   } catch (error) {

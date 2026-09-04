@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import HelpfulVoteButton from "@/app/community/fixes/[id]/helpful-vote-button";
 import SaveFixButton from "@/app/community/fixes/[id]/save-fix-button";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -52,6 +53,21 @@ export default async function PublicFixPage({
     notFound();
   }
 
+  const [helpfulCount, currentVote] = await Promise.all([
+    prisma.helpfulVote.count({ where: { fixId: fix.id } }),
+    session?.user.id && session.user.id !== fix.userId
+      ? prisma.helpfulVote.findUnique({
+        where: {
+          userId_fixId: {
+            userId: session.user.id,
+            fixId: fix.id,
+          },
+        },
+        select: { id: true },
+      })
+      : Promise.resolve(null),
+  ]);
+
   return (
     <main className="min-h-screen bg-[#fafafa] text-zinc-900">
       <nav className="border-b border-zinc-200/80 bg-white/80 backdrop-blur">
@@ -67,13 +83,14 @@ export default async function PublicFixPage({
             <div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">🌐 Public Fix</span><span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600">{fix.category ?? "Uncategorized"}</span></div>
             <h1 className="mt-4 break-words text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl">{fix.title}</h1>
             <p className="mt-3 text-sm text-zinc-600">Shared by {fix.user.name}</p>
+            <p className="mt-3 text-sm font-medium text-zinc-600">👍 {helpfulCount} Helpful</p>
             {fix.tags && <div className="mt-4 flex flex-wrap gap-2">{fix.tags.split(/[\s,]+/).filter(Boolean).map((tag) => <span key={tag} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs text-zinc-600">{tag.startsWith("#") ? tag : `#${tag}`}</span>)}</div>}
             {session?.user.id === fix.userId ? (
               <Link href={`/fixes/${fix.id}`} className="mt-5 inline-flex rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">View in my FixLog</Link>
             ) : session ? (
-              <SaveFixButton fixId={fix.id} />
+              <div className="flex flex-wrap gap-3"><SaveFixButton fixId={fix.id} /><HelpfulVoteButton fixId={fix.id} initialHelpful={Boolean(currentVote)} initialHelpfulCount={helpfulCount} /></div>
             ) : (
-              <Link href="/auth" className="mt-5 inline-flex rounded-lg bg-zinc-900 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20">Log in to save this Fix</Link>
+              <div className="mt-5 flex flex-wrap items-center gap-3"><Link href="/auth" className="inline-flex rounded-lg bg-zinc-900 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20">Log in to save this Fix</Link><Link href="/auth" className="rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Log in to vote</Link></div>
             )}
           </header>
           <dl className="grid gap-6 px-5 py-6 sm:px-6">

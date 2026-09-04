@@ -69,6 +69,7 @@ type SemanticSearchResponse = {
 type CommunitySearchMatch = SimilarFixMatch & {
   updatedAt: string;
   authorName?: string;
+  helpfulCount?: number;
 };
 
 type CommunitySearchResponse = {
@@ -1121,6 +1122,9 @@ function CommunityResultList({
                   {tag.startsWith("#") ? tag : `#${tag}`}
                 </span>
               ))}
+              {!own && typeof fix.helpfulCount === "number" && (
+                <span className="text-xs font-medium text-zinc-600">👍 {fix.helpfulCount} Helpful</span>
+              )}
               <span className="text-xs text-zinc-500">Updated {formatUpdatedDate(fix.updatedAt)}</span>
               <Link
                 href={own ? `/fixes/${fix.id}` : `/community/fixes/${fix.id}`}
