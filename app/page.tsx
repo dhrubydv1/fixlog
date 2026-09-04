@@ -1,21 +1,55 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import Link from "next/link";
 
-import Dashboard from "@/app/dashboard";
-import { isFixSuggestionsConfigured } from "@/lib/ai";
-import { auth } from "@/lib/auth";
+const features = [
+  "Save problems, errors, causes, and solutions",
+  "Categories, tags, and favorites",
+  "Search, filter, and sort your saved fixes",
+  "AI-assisted documentation that you review first",
+  "Personal dashboard statistics",
+  "Private per-user workspace",
+  "Secure authentication, email verification, and password recovery",
+];
 
-export default async function Home() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+const steps = [
+  ["01", "Encounter a problem", "Capture the error and context while it is fresh."],
+  ["02", "Solve it", "Work through the cause and confirm the solution."],
+  ["03", "Save it in FixLog", "Keep the useful details in one private workspace."],
+  ["04", "Find it instantly", "Search your own solutions the next time it appears."],
+];
 
-  if (!session) {
-    redirect("/auth");
-  }
+export default function Home() {
+  return (
+    <main className="min-h-screen overflow-x-hidden bg-[#fafafa] text-zinc-900">
+      <nav aria-label="Primary navigation" className="border-b border-zinc-200/80 bg-white/85 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-2.5 rounded-md focus:outline-none focus:ring-4 focus:ring-zinc-900/10"><span className="grid size-8 place-items-center rounded-lg bg-zinc-900 text-sm font-bold text-white shadow-sm">F</span><span><span className="block text-sm font-semibold tracking-tight">FixLog</span><span className="block text-xs text-zinc-500">Developer memory</span></span></Link>
+          <div className="hidden items-center gap-6 sm:flex"><a href="#features" className="text-sm font-medium text-zinc-600 transition hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Features</a><a href="#how-it-works" className="text-sm font-medium text-zinc-600 transition hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">How it works</a><Link href="/auth" className="text-sm font-medium text-zinc-700 transition hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Log in</Link><Link href="/auth" className="rounded-lg bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20">Get Started</Link></div>
+          <div className="flex items-center gap-2 sm:hidden"><Link href="/auth" className="rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Log in</Link><details className="relative"><summary className="cursor-pointer list-none rounded-lg border border-zinc-300 px-2.5 py-2 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Menu</summary><div className="absolute right-0 z-10 mt-2 grid w-44 gap-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg"><a href="#features" className="rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">Features</a><a href="#how-it-works" className="rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">How it works</a><Link href="/auth" className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white">Get Started</Link></div></details></div>
+        </div>
+      </nav>
 
-  return <Dashboard
-    user={session.user}
-    aiSuggestionsConfigured={isFixSuggestionsConfigured()}
-  />;
+      <section className="mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-[1fr_0.95fr] lg:items-center lg:gap-16 lg:px-8">
+        <div className="max-w-2xl"><p className="inline-flex rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 shadow-sm">Your private developer memory</p><h1 className="mt-5 text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl lg:text-6xl">Never solve the same bug twice.</h1><p className="mt-5 max-w-xl text-base leading-7 text-zinc-600 sm:text-lg">FixLog is your personal developer memory. Save errors, causes, and solutions, then find them instantly when you need them again.</p><div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link href="/auth" className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20">Start for free</Link><a href="#how-it-works" className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-5 py-3 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">See how it works</a></div></div>
+        <ProductMockup />
+      </section>
+
+      <section className="border-y border-zinc-200 bg-white" aria-labelledby="problem-heading"><div className="mx-auto grid max-w-6xl gap-8 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16 lg:px-8"><div><p className="text-sm font-medium text-zinc-500">The problem</p><h2 id="problem-heading" className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950">Your hard-won fixes should not disappear into old tabs.</h2></div><p className="max-w-2xl text-base leading-8 text-zinc-600">Developers repeatedly encounter errors they have already solved, but forget the exact cause, command, or workaround. FixLog turns those moments into a searchable personal knowledge base of your previously solved development problems.</p></div></section>
+
+      <section id="features" className="scroll-mt-8 mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8" aria-labelledby="features-heading"><header className="max-w-2xl"><p className="text-sm font-medium text-zinc-500">Built for the work you already do</p><h2 id="features-heading" className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">A practical memory system for developers.</h2></header><ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{features.map((feature) => <li key={feature} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"><span aria-hidden="true" className="grid size-8 place-items-center rounded-lg bg-zinc-100 text-sm font-semibold text-zinc-700">✓</span><p className="mt-4 text-sm font-medium leading-6 text-zinc-800">{feature}</p></li>)}</ul></section>
+
+      <section className="border-y border-zinc-200 bg-zinc-950 text-white" aria-labelledby="ai-heading"><div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-8"><div><p className="text-sm font-medium text-zinc-400">FixLog AI</p><h2 id="ai-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Turn rough context into a useful draft.</h2><p className="mt-4 max-w-xl text-base leading-7 text-zinc-300">Paste an error or problem, then let FixLog suggest the structure of a fix. You review every suggestion, edit anything you need, and choose when to save.</p></div><div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl sm:p-6"><p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Paste</p><p className="mt-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 font-mono text-sm leading-6 text-zinc-200">Prisma can&apos;t connect to Neon on Vercel</p><div className="my-4 border-t border-zinc-700" /><p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">FixLog AI suggests</p><ul className="mt-3 grid gap-2 text-sm text-zinc-200">{["Title", "Cause", "Solution", "Category", "Tags"].map((item) => <li key={item} className="flex items-center gap-2"><span className="text-emerald-400">✓</span>{item}</li>)}</ul><p className="mt-4 text-xs leading-5 text-zinc-400">Suggestions are a draft—not an automatic fix or database write.</p></div></div></section>
+
+      <section id="how-it-works" className="scroll-mt-8 mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8" aria-labelledby="how-heading"><header className="max-w-2xl"><p className="text-sm font-medium text-zinc-500">How it works</p><h2 id="how-heading" className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">A better habit for solving problems.</h2></header><ol className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{steps.map(([number, title, description]) => <li key={number} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"><p className="text-sm font-semibold text-zinc-400">{number}</p><h3 className="mt-6 text-base font-semibold text-zinc-950">{title}</h3><p className="mt-2 text-sm leading-6 text-zinc-600">{description}</p></li>)}</ol></section>
+
+      <section className="border-y border-zinc-200 bg-white" aria-labelledby="privacy-heading"><div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8"><p className="text-sm font-medium text-zinc-500">Privacy and security</p><h2 id="privacy-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-zinc-950">Your developer memory stays personal.</h2><div className="mt-8 grid gap-5 sm:grid-cols-3">{["Every user’s fixes are private.", "Server-side authorization protects Fix ownership.", "You control what gets saved in your workspace."].map((item) => <p key={item} className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm leading-6 text-zinc-700">{item}</p>)}</div></div></section>
+
+      <section className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 sm:py-24 lg:px-8" aria-labelledby="cta-heading"><h2 id="cta-heading" className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">Stop solving the same problem twice.</h2><Link href="/auth" className="mt-7 inline-flex rounded-lg bg-zinc-900 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20">Create your FixLog</Link></section>
+
+      <footer className="border-t border-zinc-200 bg-white"><div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"><div><p className="font-semibold text-zinc-800">FixLog</p><p className="mt-1">A private memory for the fixes you never want to solve twice.</p></div><div className="flex items-center gap-5"><a href="https://github.com/" className="font-medium text-zinc-600 hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">GitHub</a><p>© {new Date().getFullYear()} FixLog</p></div></div></footer>
+    </main>
+  );
+}
+
+function ProductMockup() {
+  return <div aria-label="FixLog dashboard preview" className="relative rounded-2xl border border-zinc-200 bg-white p-3 shadow-xl shadow-zinc-900/10 sm:p-5"><div className="flex items-center justify-between border-b border-zinc-100 pb-4"><div className="flex items-center gap-2"><span className="size-2 rounded-full bg-red-300"/><span className="size-2 rounded-full bg-amber-300"/><span className="size-2 rounded-full bg-emerald-300"/></div><span className="text-xs font-medium text-zinc-400">Your Fixes</span></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{["18 fixes", "4 favorites", "6 categories", "3 updated"].map((item) => <div key={item} className="rounded-lg border border-zinc-100 bg-zinc-50 p-2.5 text-xs font-medium text-zinc-600">{item}</div>)}</div><div className="mt-4 rounded-lg border border-zinc-200 px-3 py-2.5 text-xs text-zinc-400">Search fixes, errors, or tags…</div><div className="mt-3 rounded-xl border border-zinc-200 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-zinc-900">Prisma connection on Vercel</p><p className="mt-1 text-xs leading-5 text-zinc-500">Use the pooled database URL for serverless connections.</p></div><span className="text-lg text-amber-500">★</span></div><div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">Database</span><span className="rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-600">#prisma</span><span className="rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-600">#vercel</span></div></div></div>;
 }

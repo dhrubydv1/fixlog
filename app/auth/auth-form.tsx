@@ -104,7 +104,7 @@ export default function AuthForm() {
         return;
       }
 
-      router.replace("/");
+      router.replace("/dashboard");
       router.refresh();
     } catch {
       setErrorMessage("Unable to reach FixLog. Please try again.");

@@ -453,7 +453,7 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
     <main className="min-h-screen bg-[#fafafa] text-zinc-900">
       <nav className="border-b border-zinc-200/80 bg-white/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="group flex items-center gap-2.5 rounded-md focus:outline-none focus:ring-4 focus:ring-zinc-900/10">
+          <Link href="/dashboard" className="group flex items-center gap-2.5 rounded-md focus:outline-none focus:ring-4 focus:ring-zinc-900/10">
             <span className="grid size-8 place-items-center rounded-lg bg-zinc-900 text-sm font-bold text-white shadow-sm">F</span>
             <span>
               <span className="block text-sm font-semibold tracking-tight">FixLog</span>
