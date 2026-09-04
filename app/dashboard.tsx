@@ -53,6 +53,17 @@ type SimilarFixResponse = {
   error?: string;
 };
 
+type SemanticSearchMatch = SimilarFixMatch & {
+  reason: string;
+};
+
+type SemanticSearchResponse = {
+  configured?: boolean;
+  matches?: SemanticSearchMatch[];
+  message?: string;
+  error?: string;
+};
+
 type CategoryFilter = "all" | "uncategorized" | (typeof FIX_CATEGORIES)[number];
 type FavoriteFilter = "all" | "favorites" | "non-favorites";
 type SortOption = "newest" | "oldest" | "updated" | "title-asc" | "title-desc";
@@ -149,6 +160,9 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
   const [updatingFavoriteFixId, setUpdatingFavoriteFixId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [semanticSearchMatches, setSemanticSearchMatches] = useState<SemanticSearchMatch[] | null>(null);
+  const [isSemanticSearching, setIsSemanticSearching] = useState(false);
+  const [semanticSearchError, setSemanticSearchError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [favoriteFilter, setFavoriteFilter] = useState<FavoriteFilter>("all");
   const [sortOption, setSortOption] = useState<SortOption>("newest");
@@ -427,6 +441,48 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
     setCategoryFilter("all");
     setFavoriteFilter("all");
     setSortOption("newest");
+  }
+
+  async function searchWithAi() {
+    const query = searchQuery.trim();
+
+    if (!query) {
+      return;
+    }
+
+    setIsSemanticSearching(true);
+    setSemanticSearchError(null);
+    setSemanticSearchMatches(null);
+
+    try {
+      const response = await fetch("/api/ai/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const data: SemanticSearchResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Unable to search with AI");
+      }
+
+      if (!data.configured) {
+        throw new Error(data.message || "AI setup required");
+      }
+
+      setSemanticSearchMatches(data.matches ?? []);
+    } catch (error) {
+      setSemanticSearchError(
+        error instanceof Error ? error.message : "Unable to search with AI",
+      );
+    } finally {
+      setIsSemanticSearching(false);
+    }
+  }
+
+  function returnToRegularSearch() {
+    setSemanticSearchMatches(null);
+    setSemanticSearchError(null);
   }
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
@@ -725,7 +781,7 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
         <section aria-labelledby="recent-fixes-heading">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 id="recent-fixes-heading" className="text-lg font-semibold tracking-tight text-zinc-950">Recent Fixes</h2>
+              <h2 id="recent-fixes-heading" className="text-lg font-semibold tracking-tight text-zinc-950">{semanticSearchMatches ? "Keyword results" : "Recent Fixes"}</h2>
               <p className="mt-1 text-sm text-zinc-500">
                 {isLoading ? "Loading fixes..." : `Showing ${visibleFixes.length} of ${fixes.length} ${fixes.length === 1 ? "fix" : "fixes"}`}
               </p>
@@ -749,6 +805,24 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
               <label htmlFor="fix-search" className="sr-only">Search fixes</label>
               <input id="fix-search" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search fixes, errors, causes, solutions, tags, or categories..." className="w-full rounded-xl border border-zinc-300 bg-white py-3 pl-10 pr-4 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/10" />
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-zinc-400"><SearchIcon /></span>
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-zinc-50/70 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-zinc-600">Keyword search updates instantly. Use AI search for natural-language intent.</p>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={searchWithAi}
+                  disabled={!aiSuggestionsConfigured || isSemanticSearching || !normalizedSearchQuery}
+                  title={aiSuggestionsConfigured ? "Search your FixLog with AI" : "AI setup required"}
+                  className="rounded-lg bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+                >
+                  {isSemanticSearching ? "Searching..." : "Search with AI"}
+                </button>
+                {semanticSearchMatches && (
+                  <button type="button" onClick={returnToRegularSearch} className="rounded-lg border border-zinc-300 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Back to regular search</button>
+                )}
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -785,6 +859,28 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
           {loadError && <p role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</p>}
           {deleteError && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</p>}
           {favoriteError && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{favoriteError}</p>}
+          {semanticSearchError && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{semanticSearchError}</p>}
+
+          {semanticSearchMatches && (
+            <section aria-labelledby="ai-search-results-heading" className="mt-5 rounded-xl border border-violet-100 bg-violet-50/50 p-5 shadow-sm sm:p-6">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div><p className="text-xs font-semibold uppercase tracking-wide text-violet-700">AI search results</p><h3 id="ai-search-results-heading" className="mt-1 text-lg font-semibold tracking-tight text-zinc-950">Results for “{searchQuery.trim()}”</h3><p className="mt-1 text-sm text-zinc-600">Ranked by meaning from your private FixLog.</p></div>
+                <span className="w-fit rounded-full bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 shadow-sm">{semanticSearchMatches.length} {semanticSearchMatches.length === 1 ? "match" : "matches"}</span>
+              </div>
+              {semanticSearchMatches.length === 0 ? (
+                <p className="mt-4 text-sm leading-6 text-zinc-600">No relevant AI matches were found in your saved fixes. Try a different description or return to keyword search.</p>
+              ) : (
+                <div className="mt-4 grid gap-3">
+                  {semanticSearchMatches.map((fix) => (
+                    <article key={fix.id} className="rounded-lg border border-violet-100 bg-white p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><h4 className="font-medium text-zinc-950">{fix.title}</h4><p className="mt-1 text-sm leading-6 text-zinc-600">{fix.reason}</p></div><span className="shrink-0 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">{Math.round(fix.score * 100)}% relevant</span></div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2"><span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">{fix.category ?? "Uncategorized"}</span>{fix.tags && getTags(fix.tags).slice(0, 4).map((tag) => <span key={tag} className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-600">{tag.startsWith("#") ? tag : `#${tag}`}</span>)}<Link href={`/fixes/${fix.id}`} className="ml-auto rounded-md px-2.5 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">View Fix</Link></div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           {!isLoading && !loadError && (
             <div className="mt-5 grid gap-3">
