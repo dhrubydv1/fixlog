@@ -630,6 +630,7 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
               <p className="max-w-40 truncate text-sm font-medium text-zinc-800">{user.name}</p>
               <p className="max-w-40 truncate text-xs text-zinc-500">{user.email}</p>
             </div>
+            <Link href="/community" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10 md:inline-flex">Community</Link>
             <Link
               href="/settings"
               aria-label="Open settings"
