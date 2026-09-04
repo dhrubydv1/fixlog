@@ -38,6 +38,21 @@ type AiSuggestionResponse = {
   error?: string;
 };
 
+type SimilarFixMatch = {
+  id: number;
+  title: string;
+  problem: string;
+  errorMessage: string | null;
+  category: string | null;
+  tags: string | null;
+  score: number;
+};
+
+type SimilarFixResponse = {
+  matches?: SimilarFixMatch[];
+  error?: string;
+};
+
 type CategoryFilter = "all" | "uncategorized" | (typeof FIX_CATEGORIES)[number];
 type FavoriteFilter = "all" | "favorites" | "non-favorites";
 type SortOption = "newest" | "oldest" | "updated" | "title-asc" | "title-desc";
@@ -120,6 +135,9 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
   const [aiSuggestions, setAiSuggestions] = useState<FixSuggestion | null>(null);
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [aiSuggestionError, setAiSuggestionError] = useState<string | null>(null);
+  const [similarFixes, setSimilarFixes] = useState<SimilarFixMatch[] | null>(null);
+  const [isFindingSimilarFixes, setIsFindingSimilarFixes] = useState(false);
+  const [similarFixesError, setSimilarFixesError] = useState<string | null>(null);
   const [fixes, setFixes] = useState<Fix[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -148,6 +166,8 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
     setCategory("");
     setAiSuggestions(null);
     setAiSuggestionError(null);
+    setSimilarFixes(null);
+    setSimilarFixesError(null);
   }
 
   function closeForm() {
@@ -294,6 +314,33 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
     if (aiSuggestions.tags) setTags(aiSuggestions.tags.join(", "));
 
     setAiSuggestions(null);
+  }
+
+  async function findSimilarFixes() {
+    setIsFindingSimilarFixes(true);
+    setSimilarFixesError(null);
+    setSimilarFixes(null);
+
+    try {
+      const response = await fetch("/api/fixes/similar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, problem, errorMessage, cause, solution, tags, category }),
+      });
+      const data: SimilarFixResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to find similar fixes");
+      }
+
+      setSimilarFixes(data.matches ?? []);
+    } catch (error) {
+      setSimilarFixesError(
+        error instanceof Error ? error.message : "Unable to find similar fixes",
+      );
+    } finally {
+      setIsFindingSimilarFixes(false);
+    }
   }
 
   async function handleSignOut() {
@@ -536,16 +583,26 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
                       : "AI suggestions will be available once AI setup is complete."}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={generateSuggestions}
-                  disabled={!aiSuggestionsConfigured || isGeneratingSuggestions || (!problem.trim() && !errorMessage.trim())}
-                  title={aiSuggestionsConfigured ? "Generate Fix suggestions" : "AI setup required"}
-                  aria-describedby="ai-suggestions-status"
-                  className="inline-flex shrink-0 items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
-                >
-                  {isGeneratingSuggestions ? "Generating..." : "Generate with AI"}
-                </button>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={findSimilarFixes}
+                    disabled={isFindingSimilarFixes || (!problem.trim() && !errorMessage.trim())}
+                    className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400"
+                  >
+                    {isFindingSimilarFixes ? "Finding..." : "Find similar fixes"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={generateSuggestions}
+                    disabled={!aiSuggestionsConfigured || isGeneratingSuggestions || (!problem.trim() && !errorMessage.trim())}
+                    title={aiSuggestionsConfigured ? "Generate Fix suggestions" : "AI setup required"}
+                    aria-describedby="ai-suggestions-status"
+                    className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+                  >
+                    {isGeneratingSuggestions ? "Generating..." : "Generate with AI"}
+                  </button>
+                </div>
                 <span id="ai-suggestions-status" className="sr-only">
                   {!aiSuggestionsConfigured
                     ? "AI setup required"
@@ -560,6 +617,39 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
               <p role="alert" className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700 sm:px-6">
                 {aiSuggestionError}
               </p>
+            )}
+
+            {similarFixesError && (
+              <p role="alert" className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700 sm:px-6">
+                {similarFixesError}
+              </p>
+            )}
+
+            {similarFixes && (
+              <section aria-labelledby="similar-fixes-heading" className="border-b border-zinc-200 bg-zinc-50/70 px-5 py-5 sm:px-6">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Personal workspace</p>
+                    <h2 id="similar-fixes-heading" className="mt-1 text-base font-semibold text-zinc-950">Similar fixes</h2>
+                  </div>
+                  <button type="button" onClick={() => setSimilarFixes(null)} className="rounded-md px-2 py-1 text-sm font-medium text-zinc-600 hover:bg-zinc-200 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Dismiss</button>
+                </div>
+                {similarFixes.length === 0 ? (
+                  <p className="mt-3 text-sm leading-6 text-zinc-600">No meaningful matches in your saved fixes yet.</p>
+                ) : (
+                  <div className="mt-4 grid gap-3">
+                    {similarFixes.map((fix) => (
+                      <article key={fix.id} className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0"><h3 className="font-medium text-zinc-950">{fix.title}</h3><p className="mt-1 text-sm leading-6 text-zinc-600">{(fix.errorMessage || fix.problem).slice(0, 180)}{(fix.errorMessage || fix.problem).length > 180 ? "…" : ""}</p></div>
+                          <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">{Math.round(fix.score * 100)}% similar</span>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2"><span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">{fix.category ?? "Uncategorized"}</span>{fix.tags && getTags(fix.tags).slice(0, 4).map((tag) => <span key={tag} className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-600">{tag.startsWith("#") ? tag : `#${tag}`}</span>)}<Link href={`/fixes/${fix.id}`} className="ml-auto rounded-md px-2.5 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">View Fix</Link></div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
             )}
 
             {aiSuggestions && (

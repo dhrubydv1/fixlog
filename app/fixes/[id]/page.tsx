@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import SimilarFixes from "@/app/fixes/[id]/similar-fixes";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -89,6 +90,18 @@ export default async function FixDetailsPage({
             </div>
           </dl>
         </article>
+        <SimilarFixes
+          fix={{
+            id: fix.id,
+            title: fix.title,
+            problem: fix.problem,
+            errorMessage: fix.errorMessage,
+            cause: fix.cause,
+            solution: fix.solution,
+            tags: fix.tags,
+            category: fix.category,
+          }}
+        />
       </div>
     </main>
   );
