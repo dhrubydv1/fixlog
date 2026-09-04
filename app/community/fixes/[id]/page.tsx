@@ -1,6 +1,9 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import SaveFixButton from "@/app/community/fixes/[id]/save-fix-button";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function formatDate(date: Date) {
@@ -16,6 +19,7 @@ export default async function PublicFixPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth.api.getSession({ headers: await headers() });
   const { id } = await params;
   const fixId = Number(id);
 
@@ -29,6 +33,8 @@ export default async function PublicFixPage({
       visibility: "PUBLIC",
     },
     select: {
+      id: true,
+      userId: true,
       title: true,
       problem: true,
       errorMessage: true,
@@ -62,6 +68,13 @@ export default async function PublicFixPage({
             <h1 className="mt-4 break-words text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl">{fix.title}</h1>
             <p className="mt-3 text-sm text-zinc-600">Shared by {fix.user.name}</p>
             {fix.tags && <div className="mt-4 flex flex-wrap gap-2">{fix.tags.split(/[\s,]+/).filter(Boolean).map((tag) => <span key={tag} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs text-zinc-600">{tag.startsWith("#") ? tag : `#${tag}`}</span>)}</div>}
+            {session?.user.id === fix.userId ? (
+              <Link href={`/fixes/${fix.id}`} className="mt-5 inline-flex rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">View in my FixLog</Link>
+            ) : session ? (
+              <SaveFixButton fixId={fix.id} />
+            ) : (
+              <Link href="/auth" className="mt-5 inline-flex rounded-lg bg-zinc-900 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20">Log in to save this Fix</Link>
+            )}
           </header>
           <dl className="grid gap-6 px-5 py-6 sm:px-6">
             <PublicField label="Problem" value={fix.problem} />
