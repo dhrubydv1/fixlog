@@ -67,6 +67,7 @@ function overlap(left: Set<string>, right: Set<string>) {
 export function findSimilarFixes(
   input: SimilarFixInput,
   candidates: SimilarFixCandidate[],
+  limit = 5,
 ): SimilarFixMatch[] {
   const titleTokens = tokens(input.title);
   const problemTokens = tokens(input.problem);
@@ -141,5 +142,16 @@ export function findSimilarFixes(
       }];
     })
     .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title))
-    .slice(0, 5);
+    .slice(0, limit);
+}
+
+export function buildSimilaritySearchInput(query: string): SimilarFixInput {
+  return {
+    title: query,
+    problem: query,
+    errorMessage: query,
+    cause: query,
+    solution: query,
+    tags: query,
+  };
 }

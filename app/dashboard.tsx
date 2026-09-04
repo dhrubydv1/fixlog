@@ -66,6 +66,17 @@ type SemanticSearchResponse = {
   error?: string;
 };
 
+type CommunitySearchMatch = SimilarFixMatch & {
+  updatedAt: string;
+  authorName?: string;
+};
+
+type CommunitySearchResponse = {
+  ownMatches?: CommunitySearchMatch[];
+  communityMatches?: CommunitySearchMatch[];
+  error?: string;
+};
+
 type CategoryFilter = "all" | "uncategorized" | (typeof FIX_CATEGORIES)[number];
 type FavoriteFilter = "all" | "favorites" | "non-favorites";
 type SortOption = "newest" | "oldest" | "updated" | "title-asc" | "title-desc";
@@ -166,6 +177,9 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
   const [semanticSearchMatches, setSemanticSearchMatches] = useState<SemanticSearchMatch[] | null>(null);
   const [isSemanticSearching, setIsSemanticSearching] = useState(false);
   const [semanticSearchError, setSemanticSearchError] = useState<string | null>(null);
+  const [communitySearchResults, setCommunitySearchResults] = useState<{ ownMatches: CommunitySearchMatch[]; communityMatches: CommunitySearchMatch[] } | null>(null);
+  const [isCommunitySearching, setIsCommunitySearching] = useState(false);
+  const [communitySearchError, setCommunitySearchError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [favoriteFilter, setFavoriteFilter] = useState<FavoriteFilter>("all");
   const [sortOption, setSortOption] = useState<SortOption>("newest");
@@ -489,6 +503,47 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
   function returnToRegularSearch() {
     setSemanticSearchMatches(null);
     setSemanticSearchError(null);
+  }
+
+  async function searchCommunity() {
+    const query = searchQuery.trim();
+
+    if (!query) {
+      return;
+    }
+
+    setIsCommunitySearching(true);
+    setCommunitySearchError(null);
+    setCommunitySearchResults(null);
+
+    try {
+      const response = await fetch("/api/community/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const data: CommunitySearchResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to search community fixes");
+      }
+
+      setCommunitySearchResults({
+        ownMatches: data.ownMatches ?? [],
+        communityMatches: data.communityMatches ?? [],
+      });
+    } catch (error) {
+      setCommunitySearchError(
+        error instanceof Error ? error.message : "Unable to search community fixes",
+      );
+    } finally {
+      setIsCommunitySearching(false);
+    }
+  }
+
+  function returnToRegularCommunitySearch() {
+    setCommunitySearchResults(null);
+    setCommunitySearchError(null);
   }
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
@@ -830,8 +885,16 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
             </div>
 
             <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-zinc-50/70 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-zinc-600">Keyword search updates instantly. Use AI search for natural-language intent.</p>
+              <p className="text-sm text-zinc-600">Search your memory first. Learn from the community when you haven&apos;t solved it yet.</p>
               <div className="flex shrink-0 flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={searchCommunity}
+                  disabled={isCommunitySearching || !normalizedSearchQuery}
+                  className="rounded-lg border border-zinc-300 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400"
+                >
+                  {isCommunitySearching ? "Searching..." : "Search community"}
+                </button>
                 <button
                   type="button"
                   onClick={searchWithAi}
@@ -843,6 +906,9 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
                 </button>
                 {semanticSearchMatches && (
                   <button type="button" onClick={returnToRegularSearch} className="rounded-lg border border-zinc-300 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Back to regular search</button>
+                )}
+                {communitySearchResults && (
+                  <button type="button" onClick={returnToRegularCommunitySearch} className="rounded-lg border border-zinc-300 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Back to regular search</button>
                 )}
               </div>
             </div>
@@ -882,6 +948,20 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
           {deleteError && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</p>}
           {favoriteError && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{favoriteError}</p>}
           {semanticSearchError && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{semanticSearchError}</p>}
+          {communitySearchError && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{communitySearchError}</p>}
+
+          {communitySearchResults && (
+            <section aria-labelledby="community-search-results-heading" className="mt-5 grid gap-5">
+              <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+                <div><p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Your fixes</p><h3 id="community-search-results-heading" className="mt-1 text-lg font-semibold tracking-tight text-zinc-950">Search your memory first</h3><p className="mt-1 text-sm text-zinc-600">Best matches from your private workspace for “{searchQuery.trim()}”.</p></div>
+                <CommunityResultList matches={communitySearchResults.ownMatches} own />
+              </div>
+              <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-5 shadow-sm sm:p-6">
+                <div><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Community fixes</p><h3 className="mt-1 text-lg font-semibold tracking-tight text-zinc-950">Learn from public solutions</h3><p className="mt-1 text-sm text-zinc-600">Only public Fixes from other developers are shown.</p></div>
+                <CommunityResultList matches={communitySearchResults.communityMatches} />
+              </div>
+            </section>
+          )}
 
           {semanticSearchMatches && (
             <section aria-labelledby="ai-search-results-heading" className="mt-5 rounded-xl border border-violet-100 bg-violet-50/50 p-5 shadow-sm sm:p-6">
@@ -988,6 +1068,71 @@ export default function Dashboard({ user, aiSuggestionsConfigured }: DashboardPr
         </section>
       </div>
     </main>
+  );
+}
+
+function CommunityResultList({
+  matches,
+  own = false,
+}: {
+  matches: CommunitySearchMatch[];
+  own?: boolean;
+}) {
+  if (matches.length === 0) {
+    return (
+      <p className="mt-4 text-sm leading-6 text-zinc-600">
+        {own
+          ? "No meaningful matches were found in your saved fixes."
+          : "No relevant public community fixes were found."}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-4 grid gap-3">
+      {matches.map((fix) => {
+        const preview = fix.errorMessage || fix.problem;
+        const truncatedPreview = preview.length > 180 ? `${preview.slice(0, 180)}…` : preview;
+
+        return (
+          <article key={fix.id} className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h4 className="font-medium text-zinc-950">{fix.title}</h4>
+                {truncatedPreview && (
+                  <p className="mt-1 text-sm leading-6 text-zinc-600">{truncatedPreview}</p>
+                )}
+                {!own && fix.authorName && (
+                  <p className="mt-2 text-xs font-medium text-zinc-500">
+                    Shared by {fix.authorName}
+                  </p>
+                )}
+              </div>
+              <span className="w-fit shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                {Math.round(fix.score * 100)}% relevant
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                {fix.category ?? "Uncategorized"}
+              </span>
+              {fix.tags && getTags(fix.tags).slice(0, 4).map((tag) => (
+                <span key={tag} className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-600">
+                  {tag.startsWith("#") ? tag : `#${tag}`}
+                </span>
+              ))}
+              <span className="text-xs text-zinc-500">Updated {formatUpdatedDate(fix.updatedAt)}</span>
+              <Link
+                href={own ? `/fixes/${fix.id}` : `/community/fixes/${fix.id}`}
+                className="ml-auto rounded-md px-2.5 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none focus:ring-4 focus:ring-zinc-900/10"
+              >
+                {own ? "View Fix" : "View public Fix"}
+              </Link>
+            </div>
+          </article>
+        );
+      })}
+    </div>
   );
 }
 
