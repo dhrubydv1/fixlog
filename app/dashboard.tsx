@@ -69,6 +69,7 @@ type SemanticSearchResponse = {
 type CommunitySearchMatch = SimilarFixMatch & {
   updatedAt: string;
   authorName?: string;
+  authorProfilePath?: string;
   helpfulCount?: number;
 };
 
@@ -1106,7 +1107,7 @@ function CommunityResultList({
                 )}
                 {!own && fix.authorName && (
                   <p className="mt-2 text-xs font-medium text-zinc-500">
-                    Shared by {fix.authorName}
+                    {fix.authorProfilePath ? <Link href={fix.authorProfilePath} className="rounded-sm transition hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Shared by {fix.authorName}</Link> : `Shared by ${fix.authorName}`}
                   </p>
                 )}
               </div>

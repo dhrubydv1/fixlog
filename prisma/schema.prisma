@@ -17,6 +17,12 @@ enum FixVisibility {
   PUBLIC
 }
 
+enum FixReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 model User {
   id            String        @id
   name          String
@@ -29,6 +35,7 @@ model User {
   accounts      Account[]
   fixes         Fix[]
   helpfulVotes  HelpfulVote[]
+  fixReports    FixReport[]
 
   @@map("user")
 }
@@ -97,6 +104,7 @@ model Fix {
   userId       String
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   helpfulVotes HelpfulVote[]
+  reports      FixReport[]
 
   @@index([userId])
 }
@@ -114,4 +122,22 @@ model HelpfulVote {
   @@unique([userId, fixId])
   @@index([fixId])
   @@index([userId])
+}
+
+model FixReport {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  reporterId String
+  fixId      Int
+  reason     String
+  details    String?
+  status     FixReportStatus @default(OPEN)
+
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  fix      Fix  @relation(fields: [fixId], references: [id], onDelete: Cascade)
+
+  @@unique([reporterId, fixId])
+  @@index([fixId])
+  @@index([reporterId])
 }

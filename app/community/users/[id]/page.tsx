@@ -1,0 +1,150 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { cache } from "react";
+
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+
+const getPublicProfileUser = cache(async (userId: string) => (
+  prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  })
+));
+
+const publicFixSelect = {
+  id: true,
+  title: true,
+  problem: true,
+  errorMessage: true,
+  category: true,
+  tags: true,
+  updatedAt: true,
+  _count: { select: { helpfulVotes: true } },
+} as const;
+
+type PublicFix = {
+  id: number;
+  title: string;
+  problem: string;
+  errorMessage: string | null;
+  category: string | null;
+  tags: string | null;
+  updatedAt: Date;
+  _count: { helpfulVotes: number };
+};
+
+type ProfileParams = {
+  params: Promise<{ id: string }>;
+};
+
+export async function generateMetadata({ params }: ProfileParams): Promise<Metadata> {
+  const { id } = await params;
+  const user = await getPublicProfileUser(id);
+
+  if (!user) {
+    return {
+      title: "FixLog Community",
+      description: "Development problems and solutions shared publicly on FixLog.",
+    };
+  }
+
+  return {
+    title: `${user.name}'s public fixes`,
+    description: "Development problems and solutions shared publicly on FixLog.",
+  };
+}
+
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function tags(tagsValue: string | null) {
+  return tagsValue?.split(/[\s,]+/).filter(Boolean).slice(0, 4) ?? [];
+}
+
+export default async function PublicDeveloperProfile({ params }: ProfileParams) {
+  const { id: userId } = await params;
+  const user = await getPublicProfileUser(userId);
+
+  if (!user) {
+    notFound();
+  }
+
+  const publicFixWhere = {
+    userId,
+    visibility: "PUBLIC" as const,
+  };
+  const [publicFixCount, helpfulVotesReceived, topCategories, recentFixes] = await Promise.all([
+    prisma.fix.count({ where: publicFixWhere }),
+    prisma.helpfulVote.count({
+      where: {
+        fix: { is: publicFixWhere },
+      },
+    }),
+    prisma.fix.groupBy({
+      by: ["category"],
+      where: {
+        ...publicFixWhere,
+        category: { not: null },
+      },
+      _count: { category: true },
+      orderBy: [
+        { _count: { category: "desc" } },
+        { category: "asc" },
+      ],
+      take: 5,
+    }),
+    prisma.fix.findMany({
+      where: publicFixWhere,
+      select: publicFixSelect,
+      orderBy: { updatedAt: "desc" },
+      take: 10,
+    }),
+  ]);
+
+  return (
+    <main className="min-h-screen bg-[#fafafa] text-zinc-900">
+      <nav aria-label="Primary navigation" className="border-b border-zinc-200/80 bg-white/85 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-2.5 rounded-md focus:outline-none focus:ring-4 focus:ring-zinc-900/10"><span className="grid size-8 place-items-center rounded-lg bg-zinc-900 text-sm font-bold text-white shadow-sm">F</span><span><span className="block text-sm font-semibold tracking-tight">FixLog</span><span className="block text-xs text-zinc-500">Developer memory</span></span></Link>
+          <div className="flex items-center gap-2 sm:gap-4"><Link href="/community" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Community</Link><Link href="/auth" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Open FixLog</Link></div>
+        </div>
+      </nav>
+
+      <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
+        <header className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
+          <p className="text-sm font-medium text-zinc-500">Developer on FixLog</p>
+          <h1 className="mt-2 break-words text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">{user.name}</h1>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2"><ProfileStatistic label="Public fixes" value={publicFixCount} /><ProfileStatistic label="Helpful votes received" value={helpfulVotesReceived} /></div>
+        </header>
+
+        {publicFixCount === 0 ? (
+          <section className="mt-8 rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-14 text-center shadow-sm"><div className="mx-auto grid size-10 place-items-center rounded-xl bg-zinc-100 text-lg">🌐</div><h2 className="mt-4 text-lg font-semibold text-zinc-950">No public fixes shared yet.</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">This developer has not shared any public Fixes yet.</p></section>
+        ) : (
+          <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-start">
+            <section aria-labelledby="recent-public-fixes-heading"><div><p className="text-sm font-medium text-zinc-500">Public activity</p><h2 id="recent-public-fixes-heading" className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950">Recently shared fixes</h2></div><div className="mt-5 grid gap-4">{recentFixes.map((fix) => <PublicFixCard key={fix.id} fix={fix} />)}</div></section>
+            <aside aria-labelledby="top-categories-heading" className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"><p className="text-sm font-medium text-zinc-500">Public activity</p><h2 id="top-categories-heading" className="mt-1 text-lg font-semibold tracking-tight text-zinc-950">Top categories</h2>{topCategories.length === 0 ? <p className="mt-4 text-sm leading-6 text-zinc-600">No categorized public fixes yet.</p> : <ul className="mt-4 grid gap-3">{topCategories.map((category) => <li key={category.category} className="flex items-center justify-between gap-3 text-sm"><span className="min-w-0 truncate font-medium text-zinc-700">{category.category}</span><span className="shrink-0 text-zinc-500">{category._count.category}</span></li>)}</ul>}</aside>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function ProfileStatistic({ label, value }: { label: string; value: number }) {
+  return <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3"><p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</p><p className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950">{value}</p></div>;
+}
+
+function PublicFixCard({ fix }: { fix: PublicFix }) {
+  const preview = fix.errorMessage || fix.problem;
+  const truncatedPreview = preview.length > 180 ? `${preview.slice(0, 180)}…` : preview;
+
+  return <article className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">{fix.category ?? "Uncategorized"}</span><span className="text-xs font-medium text-zinc-600">👍 {fix._count.helpfulVotes} Helpful</span></div><h3 className="mt-4 text-base font-semibold tracking-tight text-zinc-950"><Link href={`/community/fixes/${fix.id}`} className="rounded-sm transition hover:text-zinc-600 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">{fix.title}</Link></h3><p className="mt-2 text-sm leading-6 text-zinc-600">{truncatedPreview}</p><div className="mt-4 flex flex-wrap gap-2">{tags(fix.tags).map((tag) => <span key={tag} className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-600">{tag.startsWith("#") ? tag : `#${tag}`}</span>)}</div><p className="mt-4 border-t border-zinc-100 pt-4 text-xs text-zinc-500">Updated {formatDate(fix.updatedAt)}</p></article>;
+}

@@ -18,7 +18,7 @@ const publicFixSelect = {
   category: true,
   tags: true,
   updatedAt: true,
-  user: { select: { name: true } },
+  user: { select: { id: true, name: true } },
   _count: { select: { helpfulVotes: true } },
 } as const;
 
@@ -30,7 +30,7 @@ type PublicFix = {
   category: string | null;
   tags: string | null;
   updatedAt: Date;
-  user: { name: string };
+  user: { id: string; name: string };
   _count: { helpfulVotes: number };
 };
 
@@ -162,7 +162,7 @@ function PublicFixCard({ fix }: { fix: PublicFix }) {
       <h3 className="mt-4 text-base font-semibold tracking-tight text-zinc-950"><Link href={`/community/fixes/${fix.id}`} className="rounded-sm transition hover:text-zinc-600 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">{fix.title}</Link></h3>
       <p className="mt-2 text-sm leading-6 text-zinc-600">{truncatedPreview}</p>
       <div className="mt-4 flex flex-wrap gap-2">{tags(fix.tags).map((tag) => <span key={tag} className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-600">{tag.startsWith("#") ? tag : `#${tag}`}</span>)}</div>
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-4 text-xs text-zinc-500"><span>Shared by {fix.user.name}</span><span>Updated {formatDate(fix.updatedAt)}</span></div>
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-4 text-xs text-zinc-500"><Link href={`/community/users/${fix.user.id}`} className="rounded-sm font-medium text-zinc-600 transition hover:text-zinc-950 focus:outline-none focus:ring-4 focus:ring-zinc-900/10">Shared by {fix.user.name}</Link><span>Updated {formatDate(fix.updatedAt)}</span></div>
     </article>
   );
 }

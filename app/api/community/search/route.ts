@@ -18,7 +18,7 @@ const candidateSelect = {
   visibility: true,
   updatedAt: true,
   _count: { select: { helpfulVotes: true } },
-  user: { select: { name: true } },
+  user: { select: { id: true, name: true } },
 } as const;
 
 function helpfulnessBoost(helpfulCount: number) {
@@ -115,6 +115,7 @@ export async function POST(request: Request) {
         helpfulCount: candidate._count.helpfulVotes,
         updatedAt: candidate.updatedAt,
         authorName: candidate.user.name,
+        authorProfilePath: `/community/users/${candidate.user.id}`,
       }];
     }).sort((left, right) => right.score - left.score || left.title.localeCompare(right.title)).slice(0, 10);
 
