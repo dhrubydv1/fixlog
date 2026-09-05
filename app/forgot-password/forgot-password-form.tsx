@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import AuthShell from "@/app/components/auth-shell";
 import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
@@ -42,25 +43,7 @@ export default function ForgotPasswordForm() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fafafa] text-zinc-900">
-      <nav className="border-b border-zinc-200/80 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center px-4 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 rounded-md focus:outline-none focus:ring-4 focus:ring-zinc-900/10"
-          >
-            <span className="grid size-8 place-items-center rounded-lg bg-zinc-900 text-sm font-bold text-white shadow-sm">
-              F
-            </span>
-            <span>
-              <span className="block text-sm font-semibold tracking-tight">FixLog</span>
-              <span className="block text-xs text-zinc-500">Developer memory</span>
-            </span>
-          </Link>
-        </div>
-      </nav>
-
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
+    <AuthShell>
         <section className="mx-auto w-full max-w-md" aria-labelledby="forgot-password-heading">
           <div className="mb-7 text-center">
             <p className="text-sm font-medium text-zinc-500">Account recovery</p>
@@ -72,7 +55,7 @@ export default function ForgotPasswordForm() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="fl-auth-card">
             {isSubmitted ? (
               <div className="grid gap-5">
                 <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800">
@@ -80,7 +63,7 @@ export default function ForgotPasswordForm() {
                 </p>
                 <Link
                   href="/auth"
-                  className="rounded-lg bg-zinc-900 px-4 py-2.5 text-center text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20"
+                  className="fl-button fl-button-primary"
                 >
                   Back to log in
                 </Link>
@@ -99,7 +82,7 @@ export default function ForgotPasswordForm() {
                     autoComplete="email"
                     placeholder="you@example.com"
                     disabled={isSubmitting}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-900/10"
+                    className="fl-field"
                   />
                 </div>
 
@@ -112,7 +95,7 @@ export default function ForgotPasswordForm() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="fl-button fl-button-primary"
                 >
                   {isSubmitting ? "Sending link..." : "Send reset link"}
                 </button>
@@ -132,7 +115,7 @@ export default function ForgotPasswordForm() {
             )}
           </div>
         </section>
-      </div>
-    </main>
+      
+    </AuthShell>
   );
 }

@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
+import { createOwnerNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const MODERATION_ACTIONS = ["KEEP", "HIDE", "DELETE"] as const;
@@ -65,7 +66,7 @@ export async function POST(
         id: fixId,
         visibility: "PUBLIC",
       },
-      select: { id: true },
+      select: { id: true, userId: true, title: true },
     });
 
     if (!fix) {
@@ -81,21 +82,38 @@ export async function POST(
         data: { status: "DISMISSED" },
       });
     } else if (action === "HIDE") {
-      await prisma.$transaction([
-        prisma.fix.update({
-          where: { id: fixId },
+      await prisma.$transaction(async (tx) => {
+        await tx.fix.update({
+          where: { id: fixId, visibility: "PUBLIC" },
           data: { visibility: "PRIVATE" },
-        }),
-        prisma.fixReport.updateMany({
+        });
+        await tx.fixReport.updateMany({
           where: {
             fixId,
             status: "OPEN",
           },
           data: { status: "RESOLVED" },
-        }),
-      ]);
+        });
+        await createOwnerNotification(tx, {
+          ownerId: fix.userId,
+          actorId: session.user.id,
+          type: "MODERATION_HIDDEN",
+          fixId,
+          fixTitle: fix.title,
+        });
+      });
     } else {
-      await prisma.fix.delete({ where: { id: fixId } });
+      await prisma.$transaction(async (tx) => {
+        // The notification belongs to the user, so deleting the Fix preserves it.
+        await createOwnerNotification(tx, {
+          ownerId: fix.userId,
+          actorId: session.user.id,
+          type: "MODERATION_DELETED",
+          fixId,
+          fixTitle: fix.title,
+        });
+        await tx.fix.delete({ where: { id: fixId, visibility: "PUBLIC" } });
+      });
     }
 
     return Response.json({ action }, { status: 200 });

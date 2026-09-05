@@ -53,7 +53,7 @@ export default function SaveFixButton({ fixId }: { fixId: number }) {
         onClick={saveFix}
         disabled={isSaving}
         aria-busy={isSaving}
-        className="inline-flex rounded-lg bg-zinc-900 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 focus:outline-none focus:ring-4 focus:ring-zinc-900/20 disabled:cursor-not-allowed disabled:opacity-60"
+        className="fl-button fl-button-primary"
       >
         {isSaving ? "Saving..." : "Save to my FixLog"}
       </button>

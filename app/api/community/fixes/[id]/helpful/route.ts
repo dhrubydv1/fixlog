@@ -1,5 +1,6 @@
 import { Prisma } from "@/app/generated/prisma/client";
 import { auth } from "@/lib/auth";
+import { createOwnerNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 function isPrismaError(error: unknown, code: string) {
@@ -37,7 +38,7 @@ export async function POST(
         id: fixId,
         visibility: "PUBLIC",
       },
-      select: { userId: true },
+      select: { userId: true, title: true },
     });
 
     if (!fix) {
@@ -72,11 +73,20 @@ export async function POST(
       }
     } else {
       try {
-        await prisma.helpfulVote.create({
-          data: {
-            userId: session.user.id,
+        await prisma.$transaction(async (tx) => {
+          await tx.helpfulVote.create({
+            data: {
+              userId: session.user.id,
+              fixId,
+            },
+          });
+          await createOwnerNotification(tx, {
+            ownerId: fix.userId,
+            actorId: session.user.id,
+            type: "HELPFUL_VOTE",
             fixId,
-          },
+            fixTitle: fix.title,
+          });
         });
       } catch (error) {
         if (!isPrismaError(error, "P2002")) {

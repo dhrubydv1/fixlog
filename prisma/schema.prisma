@@ -24,18 +24,19 @@ enum FixReportStatus {
 }
 
 model User {
-  id            String        @id
+  id            String         @id
   name          String
-  email         String        @unique
-  emailVerified Boolean       @default(false)
+  email         String         @unique
+  emailVerified Boolean        @default(false)
   image         String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   sessions      Session[]
   accounts      Account[]
   fixes         Fix[]
   helpfulVotes  HelpfulVote[]
   fixReports    FixReport[]
+  notifications Notification[]
 
   @@map("user")
 }
@@ -140,4 +141,21 @@ model FixReport {
   @@unique([reporterId, fixId])
   @@index([fixId])
   @@index([reporterId])
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  userId  String
+  type    String
+  title   String
+  message String
+  link    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, readAt])
 }

@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { createOwnerNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(
@@ -55,20 +56,30 @@ export async function POST(
       );
     }
 
-    const savedFix = await prisma.fix.create({
-      data: {
-        title: sourceFix.title,
-        problem: sourceFix.problem,
-        errorMessage: sourceFix.errorMessage,
-        cause: sourceFix.cause,
-        solution: sourceFix.solution,
-        tags: sourceFix.tags,
-        category: sourceFix.category,
-        userId: session.user.id,
-        visibility: "PRIVATE",
-        isFavorite: false,
-      },
-      select: { id: true },
+    const savedFix = await prisma.$transaction(async (tx) => {
+      const copy = await tx.fix.create({
+        data: {
+          title: sourceFix.title,
+          problem: sourceFix.problem,
+          errorMessage: sourceFix.errorMessage,
+          cause: sourceFix.cause,
+          solution: sourceFix.solution,
+          tags: sourceFix.tags,
+          category: sourceFix.category,
+          userId: session.user.id,
+          visibility: "PRIVATE",
+          isFavorite: false,
+        },
+        select: { id: true },
+      });
+      await createOwnerNotification(tx, {
+        ownerId: sourceFix.userId,
+        actorId: session.user.id,
+        type: "FIX_SAVED",
+        fixId,
+        fixTitle: sourceFix.title,
+      });
+      return copy;
     });
 
     return Response.json({ id: savedFix.id }, { status: 201 });
