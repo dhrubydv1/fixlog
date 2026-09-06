@@ -44,6 +44,10 @@ function trendingScore(fix: PublicFix, referenceTime: number) {
   return recencyScore * 0.7 + helpfulnessScore * 0.3;
 }
 
+function getCurrentTime() {
+  return Date.now();
+}
+
 export default async function CommunityPage() {
   const [trendingCandidates, mostHelpful, recentlyShared, categories] = await Promise.all([
     prisma.fix.findMany({
@@ -82,10 +86,9 @@ export default async function CommunityPage() {
     }),
   ]);
 
-  const referenceTime = trendingCandidates.reduce(
-    (latestUpdatedAt, fix) => Math.max(latestUpdatedAt, fix.updatedAt.getTime()),
-    0,
-  );
+  // Anchor recency to now so stale Fixes lose trend momentum over time,
+  // even when no newer public Fix has been shared recently.
+  const referenceTime = getCurrentTime();
   const trending = trendingCandidates
     .map((fix) => ({ fix, score: trendingScore(fix, referenceTime) }))
     .sort((left, right) => right.score - left.score || right.fix.updatedAt.getTime() - left.fix.updatedAt.getTime())

@@ -116,13 +116,17 @@ export function findSimilarFixes(
       }
 
       if (causeTokens.size > 0) {
-        score += overlap(causeTokens, tokens(candidate.cause)) * 1;
+        const causeOverlap = overlap(causeTokens, tokens(candidate.cause));
+        score += causeOverlap * 1;
         possibleScore += 1;
+        hasMeaningfulMatch ||= causeOverlap > 0;
       }
 
       if (solutionTokens.size > 0) {
-        score += overlap(solutionTokens, tokens(candidate.solution)) * 0.75;
+        const solutionOverlap = overlap(solutionTokens, tokens(candidate.solution));
+        score += solutionOverlap * 0.75;
         possibleScore += 0.75;
+        hasMeaningfulMatch ||= solutionOverlap > 0;
       }
 
       const normalizedScore = possibleScore === 0 ? 0 : score / possibleScore;
